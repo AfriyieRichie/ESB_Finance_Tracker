@@ -1,18 +1,37 @@
 import { useState, useMemo } from 'react';
 import { Wallet } from 'lucide-react';
-import { CATEGORIES } from '../hooks/useFinanceData';
+import {
+  EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
+  getCategoriesForType,
+} from '../hooks/useFinanceData';
 import { fmt } from '../utils';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
+const TYPE_CONFIG = {
+  expense: { label: '↓ Expense', activeClass: 'expense-active' },
+  income:  { label: '↑ Income',  activeClass: 'income-active'  },
+  savings: { label: '◆ Savings', activeClass: 'savings-active' },
+};
+
 function BudgetModal({ month, existing, onSave, onClose }) {
-  const [category, setCategory] = useState(existing?.category || CATEGORIES[0].name);
+  const [type, setType]         = useState(existing?.type || 'expense');
+  const [category, setCategory] = useState(
+    existing?.category || getCategoriesForType(existing?.type || 'expense').filter(c => c.name !== 'Other' && c.name !== 'Others')[0]?.name || ''
+  );
   const [amount, setAmount] = useState(existing?.amount || '');
+
+  const cats = getCategoriesForType(type).filter(c => c.name !== 'Other' && c.name !== 'Others');
+
+  const handleTypeChange = (t) => {
+    setType(t);
+    setCategory(getCategoriesForType(t).filter(c => c.name !== 'Other' && c.name !== 'Others')[0]?.name || '');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!amount || isNaN(amount) || Number(amount) <= 0) return;
-    onSave({ category, amount: Number(amount), month });
+    onSave({ type, category, amount: Number(amount), month });
     onClose();
   };
 
@@ -24,32 +43,32 @@ function BudgetModal({ month, existing, onSave, onClose }) {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} className="modal-form">
+          {!existing && (
+            <div className="form-group">
+              <label>Type</label>
+              <div className="type-toggle">
+                {Object.entries(TYPE_CONFIG).map(([t, cfg]) => (
+                  <button key={t} type="button"
+                    className={`type-btn ${type === t ? `active ${cfg.activeClass}` : ''}`}
+                    onClick={() => handleTypeChange(t)}>
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label>Category</label>
-            <CategorySelect
-              categories={CATEGORIES.filter(c => c.name !== 'Other')}
-              value={category}
-              onChange={setCategory}
-              disabled={!!existing}
-            />
+            <CategorySelect categories={cats} value={category} onChange={setCategory} disabled={!!existing} />
           </div>
           <div className="form-group">
             <label>Monthly Budget (GH₵)</label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              placeholder="0"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              autoFocus
-            />
+            <input type="number" min="1" step="1" placeholder="0"
+              value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
           </div>
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">
-              {existing ? 'Update Budget' : 'Set Budget'}
-            </button>
+            <button type="submit" className="btn-primary">{existing ? 'Update Budget' : 'Set Budget'}</button>
           </div>
         </form>
       </div>
@@ -76,11 +95,15 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
     else setMonth(m => m + 1);
   };
 
+  // Spending keyed by "type:category" to support all budget types
   const spending = useMemo(() => {
     const result = {};
     transactions
-      .filter(t => t.date.startsWith(monthStr) && t.type === 'expense')
-      .forEach(t => { result[t.category] = (result[t.category] || 0) + t.amount; });
+      .filter(t => t.date.startsWith(monthStr))
+      .forEach(t => {
+        const key = `${t.type}:${t.category}`;
+        result[key] = (result[key] || 0) + t.amount;
+      });
     return result;
   }, [transactions, monthStr]);
 
@@ -90,13 +113,18 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
   );
 
   const totalBudget = monthBudgets.reduce((s, b) => s + b.amount, 0);
-  const totalSpent  = monthBudgets.reduce((s, b) => s + (spending[b.category] || 0), 0);
+  const totalSpent  = monthBudgets.reduce((s, b) => s + (spending[`${b.type || 'expense'}:${b.category}`] || 0), 0);
 
   const openAdd  = () => { setEditing(null); setShowModal(true); };
   const openEdit = (b) => { setEditing(b); setShowModal(true); };
 
-  const alreadySet = new Set(monthBudgets.map(b => b.category));
-  const canAdd = CATEGORIES.filter(c => c.name !== 'Other' && !alreadySet.has(c.name)).length > 0;
+  const alreadySet = new Set(monthBudgets.map(b => `${b.type || 'expense'}:${b.category}`));
+  const allPossible = [
+    ...EXPENSE_CATEGORIES.filter(c => c.name !== 'Other').map(c => `expense:${c.name}`),
+    ...INCOME_CATEGORIES.filter(c => c.name !== 'Others').map(c => `income:${c.name}`),
+    ...SAVINGS_CATEGORIES.filter(c => c.name !== 'Others').map(c => `savings:${c.name}`),
+  ];
+  const canAdd = allPossible.some(key => !alreadySet.has(key));
 
   return (
     <div className="budget-page">
@@ -158,8 +186,10 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
       ) : (
         <div className="budget-grid">
           {monthBudgets.map(b => {
-            const cat   = CATEGORIES.find(c => c.name === b.category);
-            const spent = spending[b.category] || 0;
+            const btype = b.type || 'expense';
+            const allCats = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES, ...SAVINGS_CATEGORIES];
+            const cat   = allCats.find(c => c.name === b.category);
+            const spent = spending[`${btype}:${b.category}`] || 0;
             const pct   = Math.min((spent / b.amount) * 100, 100);
             const over  = spent > b.amount;
             const warn  = pct >= 70 && !over;
@@ -177,7 +207,10 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                         <CategoryIcon name={b.category} size={19} />
                       </div>
                     </div>
-                    <span className="bc-name">{b.category}</span>
+                    <div>
+                      <span className="bc-name">{b.category}</span>
+                      <span className={`bc-type-badge ${btype}`}>{TYPE_CONFIG[btype]?.label || btype}</span>
+                    </div>
                   </div>
                   <div className="bc-actions">
                     <button className="icon-btn edit-btn" onClick={() => openEdit(b)} title="Edit">✎</button>

@@ -177,7 +177,9 @@ export function useFinanceData() {
   const [budgets, setBudgets] = useState(() => {
     try {
       const saved = localStorage.getItem('pft-v2-budgets');
-      return saved ? JSON.parse(saved) : SAMPLE_BUDGETS;
+      const data = saved ? JSON.parse(saved) : SAMPLE_BUDGETS;
+      // migrate old budgets that don't have a type field
+      return data.map(b => ({ type: 'expense', ...b }));
     } catch { return SAMPLE_BUDGETS; }
   });
 
@@ -199,11 +201,15 @@ export function useFinanceData() {
 
   const upsertBudget = useCallback((budget) => {
     setBudgets(prev => {
-      const existing = prev.find(b => b.category === budget.category && b.month === budget.month);
+      const existing = prev.find(b =>
+        b.category === budget.category &&
+        b.month === budget.month &&
+        (b.type || 'expense') === (budget.type || 'expense')
+      );
       if (existing) {
         return prev.map(b => b.id === existing.id ? { ...b, amount: budget.amount } : b);
       }
-      return [...prev, { ...budget, id: genId() }];
+      return [...prev, { type: 'expense', ...budget, id: genId() }];
     });
   }, []);
 

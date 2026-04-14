@@ -1,6 +1,18 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Calendar, ChevronDown, ClipboardList } from 'lucide-react';
-import { ALL_CATEGORIES, getCategoriesForType, getCategoryInfo } from '../hooks/useFinanceData';
+import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
+
+const TYPE_ICON = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank };
+const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings' };
+function TypeBadge({ type }) {
+  const Icon = TYPE_ICON[type] || TrendingDown;
+  return (
+    <span className="cat-badge">
+      <Icon size={13} strokeWidth={1.6} color="#c8ddd5" />
+      {TYPE_LABEL[type] || type}
+    </span>
+  );
+}
+import { ALL_CATEGORIES, getCategoriesForType, getCategoryInfo, EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES } from '../hooks/useFinanceData';
 import { fmt } from '../utils';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
@@ -95,7 +107,7 @@ function TransactionModal({ onSave, onClose }) {
   );
 }
 
-function CategoryDropdown({ value, onChange }) {
+function CategoryDropdown({ value, onChange, categories }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -104,8 +116,6 @@ function CategoryDropdown({ value, onChange }) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const selected = ALL_CATEGORIES.find(c => c.name === value);
 
   return (
     <div className="cat-dropdown" ref={ref}>
@@ -128,7 +138,7 @@ function CategoryDropdown({ value, onChange }) {
           <div className="cat-dropdown-item" onClick={() => { onChange('All'); setOpen(false); }}>
             <span className="cat-dropdown-label" style={{ paddingLeft: 2 }}>All Categories</span>
           </div>
-          {ALL_CATEGORIES.map(c => (
+          {categories.map(c => (
             <div key={c.name} className={`cat-dropdown-item ${value === c.name ? 'active' : ''}`}
               onClick={() => { onChange(c.name); setOpen(false); }}>
               <CategoryIcon name={c.name} size={13} />
@@ -170,6 +180,21 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
 
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || search;
 
+  // Categories shown in dropdown depend on selected type
+  const dropdownCategories = filterType === 'All' ? ALL_CATEGORIES : getCategoriesForType(filterType);
+
+  // Reset category filter when type changes and current category doesn't belong to new type
+  const handleTypeChange = (e) => {
+    const newType = e.target.value;
+    setFilterType(newType);
+    if (newType !== 'All') {
+      const cats = getCategoriesForType(newType);
+      if (filterCategory !== 'All' && !cats.find(c => c.name === filterCategory)) {
+        setFilterCategory('All');
+      }
+    }
+  };
+
   return (
     <div className="transactions-page">
       <div className="page-header">
@@ -191,8 +216,8 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
           <input className="filter-month" type="month" value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)} />
         </div>
-        <CategoryDropdown value={filterCategory} onChange={setFilterCategory} />
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+        <CategoryDropdown value={filterCategory} onChange={setFilterCategory} categories={dropdownCategories} />
+        <select value={filterType} onChange={handleTypeChange}>
           <option value="All">All Types</option>
           <option value="income">↑ Income</option>
           <option value="expense">↓ Expense</option>
@@ -251,11 +276,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
                         {t.category}
                       </span>
                     </td>
-                    <td>
-                      <span className={`type-badge ${t.type}`}>
-                        {typeLabelMap[t.type] || t.type}
-                      </span>
-                    </td>
+                    <td><TypeBadge type={t.type} /></td>
                     <td className={`tx-amount ${t.type}`}>
                       {typeSignMap[t.type] || ''}{fmt(t.amount)}
                     </td>
