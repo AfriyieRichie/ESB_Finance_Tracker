@@ -884,8 +884,9 @@
   .recent-list--horizontal { grid-template-columns: 1fr; }
 
   /* Budget */
-  .budget-summary { flex-direction: column; gap: 16px; align-items: stretch; }
-  .budget-summary-progress { width: 100%; }
+  .budget-summary { flex-wrap: wrap; gap: 16px; }
+  .budget-summary-item { flex: 1 1 calc(50% - 8px); }
+  .budget-summary-progress { flex: 1 1 100%; }
   .budget-grid { grid-template-columns: 1fr; }
 
   /* Transactions */
@@ -931,12 +932,14 @@
 
   /* Budget */
   .budget-card { padding: 16px; }
-  .bc-amounts { flex-direction: column; gap: 10px; }
+  .bc-amounts { flex-direction: row; }
   .bc-amt-val { font-size: 15px; }
   .bs-value   { font-size: 17px; }
   .month-nav h2 { font-size: 18px; }
   .bc-icon-ring { width: 44px; height: 44px; }
   .bc-icon-inner { width: 34px; height: 34px; }
+  /* Always show action buttons on touch devices */
+  .bc-actions { opacity: 1; }
 
   /* Transactions */
   .tx-table th { font-size: 10px; padding: 10px 12px; }
