@@ -17,7 +17,7 @@ import { fmt } from '../utils';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
-function TransactionModal({ onSave, onClose }) {
+function TransactionModal({ onSave, onClose, transactions }) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
@@ -26,18 +26,44 @@ function TransactionModal({ onSave, onClose }) {
   const [amount, setAmount]     = useState('');
   const [date, setDate]         = useState(today);
   const [category, setCategory] = useState('Food & Dining');
+  const [warning, setWarning]   = useState(null); // { currentBalance, shortfall }
 
   const cats = getCategoriesForType(type);
 
-  // Reset category to first of the new type's list when type changes
   const handleTypeChange = (t) => {
     setType(t);
     setCategory(getCategoriesForType(t)[0].name);
+    setWarning(null);
+  };
+
+  const getMonthBalance = (forDate) => {
+    const month = forDate.slice(0, 7); // 'YYYY-MM'
+    const monthTx = transactions.filter(t => t.date.startsWith(month));
+    const income   = monthTx.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
+    const expenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const savings  = monthTx.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
+    return income - expenses - savings;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!description.trim() || !amount || isNaN(amount) || Number(amount) <= 0) return;
+
+    // Only warn for outflows that could push cash negative
+    if (type === 'expense' || type === 'savings') {
+      const currentBalance = getMonthBalance(date);
+      const afterBalance   = currentBalance - Number(amount);
+      if (afterBalance < 0) {
+        setWarning({ currentBalance, shortfall: Math.abs(afterBalance) });
+        return;
+      }
+    }
+
+    onSave({ description, amount: Number(amount), type, category, date });
+    onClose();
+  };
+
+  const confirmAnyway = () => {
     onSave({ description, amount: Number(amount), type, category, date });
     onClose();
   };
@@ -48,6 +74,10 @@ function TransactionModal({ onSave, onClose }) {
     savings: { label: '◆ Save / Invest', activeClass: 'savings-active' },
   };
 
+  const monthLabel = date
+    ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : '';
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -55,53 +85,74 @@ function TransactionModal({ onSave, onClose }) {
           <h3>Add Transaction</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit} className="modal-form">
-          {/* Type toggle */}
-          <div className="form-group">
-            <label>Type</label>
-            <div className="type-toggle">
-              {Object.entries(typeConfig).map(([t, cfg]) => (
-                <button key={t} type="button"
-                  className={`type-btn ${type === t ? `active ${cfg.activeClass}` : ''}`}
-                  onClick={() => handleTypeChange(t)}>
-                  {cfg.label}
-                </button>
-              ))}
+
+        {warning ? (
+          <div className="modal-warning-body">
+            <div className="modal-warning-icon">⚠</div>
+            <h4 className="modal-warning-title">Cash Balance Will Go Negative</h4>
+            <p className="modal-warning-text">
+              Your current cash balance for <strong>{monthLabel}</strong> is{' '}
+              <span className="mw-balance">GH₵ {warning.currentBalance.toFixed(2)}</span>.
+              Adding this {type} will leave you{' '}
+              <span className="mw-shortfall">GH₵ {warning.shortfall.toFixed(2)} short</span>.
+            </p>
+            <p className="modal-warning-hint">
+              Consider recording additional income first to cover the shortfall.
+            </p>
+            <div className="modal-warning-actions">
+              <button className="btn-secondary" onClick={() => setWarning(null)}>← Go Back</button>
+              <button className="btn-warning" onClick={confirmAnyway}>Proceed Anyway</button>
             </div>
           </div>
-
-          <div className="form-group">
-            <label>Description</label>
-            <input type="text" placeholder="e.g. Grocery Shopping" value={description}
-              onChange={e => setDesc(e.target.value)} autoFocus required />
-          </div>
-
-          <div className="form-row">
+        ) : (
+          <form onSubmit={handleSubmit} className="modal-form">
+            {/* Type toggle */}
             <div className="form-group">
-              <label>Amount (GH₵)</label>
-              <input type="number" min="0.01" step="0.01" placeholder="0.00" value={amount}
-                onChange={e => setAmount(e.target.value)} required />
+              <label>Type</label>
+              <div className="type-toggle">
+                {Object.entries(typeConfig).map(([t, cfg]) => (
+                  <button key={t} type="button"
+                    className={`type-btn ${type === t ? `active ${cfg.activeClass}` : ''}`}
+                    onClick={() => handleTypeChange(t)}>
+                    {cfg.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div className="form-group">
-              <label>Date</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+              <label>Description</label>
+              <input type="text" placeholder="e.g. Grocery Shopping" value={description}
+                onChange={e => setDesc(e.target.value)} autoFocus required />
             </div>
-          </div>
 
-          <div className="form-group">
-            <label>
-              {type === 'income'  ? 'Income Source' :
-               type === 'savings' ? 'Account / Instrument' :
-               'Category'}
-            </label>
-            <CategorySelect categories={cats} value={category} onChange={setCategory} />
-          </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Amount (GH₵)</label>
+                <input type="number" min="0.01" step="0.01" placeholder="0.00" value={amount}
+                  onChange={e => setAmount(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+              </div>
+            </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">Add Transaction</button>
-          </div>
-        </form>
+            <div className="form-group">
+              <label>
+                {type === 'income'  ? 'Income Source' :
+                 type === 'savings' ? 'Account / Instrument' :
+                 'Category'}
+              </label>
+              <CategorySelect categories={cats} value={category} onChange={setCategory} />
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn-primary">Add Transaction</button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -292,7 +343,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
       )}
 
       {showModal && (
-        <TransactionModal onSave={addTransaction} onClose={() => setShowModal(false)} />
+        <TransactionModal onSave={addTransaction} onClose={() => setShowModal(false)} transactions={transactions} />
       )}
     </div>
   );
