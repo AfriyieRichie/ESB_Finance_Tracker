@@ -19,8 +19,8 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-brand">
-          <span className="brand-icon">💰</span>
-          <span className="brand-name">FinanceTracker</span>
+          <img src="/logo-icon.svg" alt="ESB Finance Tracker" className="brand-logo" />
+          <span className="brand-name">ESB Finance Tracker</span>
         </div>
         <nav className="header-nav">
           {TABS.map(tab => (
