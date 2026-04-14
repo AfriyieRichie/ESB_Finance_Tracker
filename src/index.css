@@ -5,34 +5,43 @@
 }
 
 :root {
-  --bg-base:      #080d1a;
-  --bg-primary:   #0d1226;
-  --bg-card:      #121928;
-  --bg-card-alt:  #19233a;
-  --bg-input:     #19233a;
-  --border:       #1d2e4a;
-  --border-light: #253a5e;
+  /* ── Backgrounds (near-black — barely any tint) ── */
+  --bg-base:      #080a09;   /* near-black base              */
+  --bg-primary:   #0b0e0d;   /* primary surface              */
+  --bg-card:      #101512;   /* card surface                 */
+  --bg-card-alt:  #161d19;   /* hover / elevated surface     */
+  --bg-input:     #161d19;   /* form inputs                  */
 
-  --text-1: #eef2ff;
-  --text-2: #94a3b8;
-  --text-3: #5a6a82;
+  /* ── Borders (very subtle) ── */
+  --border:       #1e2b23;   /* default border               */
+  --border-light: #283d30;   /* hover / focus border         */
 
-  --indigo:  #6366f1;
-  --indigo-l:#818cf8;
-  --purple:  #8b5cf6;
-  --success: #10b981;
-  --danger:  #ef4444;
-  --warning: #f59e0b;
-  --info:    #06b6d4;
+  /* ── Text ── */
+  --text-1: #eaf5ef;         /* near-white                   */
+  --text-2: #7aaa8c;         /* muted sage                   */
+  --text-3: #456054;         /* dimmed label                 */
+
+  /* ── Accent — neon mint (the single hero colour) ── */
+  --indigo:   #00e676;       /* primary accent / CTA         */
+  --indigo-l: #2affa0;       /* lighter mint for glows       */
+  --purple:   #00c462;       /* deeper mint — gradient end   */
+
+  /* ── Status colours ── */
+  --success: #00e676;        /* income / positive (= accent) */
+  --danger:  #f04545;        /* expense / negative           */
+  --warning: #f59e0b;        /* over-budget warning          */
+  --info:    #06b6d4;        /* savings / investments accent */
   --pink:    #ec4899;
 
+  /* ── Geometry ── */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
 
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.6), 0 4px 20px rgba(0,0,0,0.35);
-  --shadow-modal: 0 24px 80px rgba(0,0,0,0.8);
+  /* ── Shadows ── */
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.6), 0 4px 20px rgba(0,0,0,0.4);
+  --shadow-modal: 0 24px 80px rgba(0,0,0,0.85);
 
   --transition: 0.18s ease;
 
@@ -47,7 +56,7 @@ html, body, #root {
 body {
   background: var(--bg-base);
   color: var(--text-1);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }

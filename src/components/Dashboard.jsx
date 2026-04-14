@@ -6,12 +6,13 @@ import {
 } from 'recharts';
 import { EXPENSE_CATEGORIES, SAVINGS_CATEGORIES, getCategoryInfo } from '../hooks/useFinanceData';
 import { fmt } from '../utils';
+import CategoryIcon from './CategoryIcon';
 
 const TOOLTIP_STYLE = {
-  backgroundColor: '#121928',
-  border: '1px solid #1d2e4a',
+  backgroundColor: '#101512',
+  border: '1px solid #1e2b23',
   borderRadius: '10px',
-  color: '#eef2ff',
+  color: '#eaf5ef',
   fontSize: '13px',
 };
 
@@ -107,10 +108,10 @@ export default function Dashboard({ transactions, budgets }) {
   );
 
   const statCards = [
-    { label: 'Monthly Income',     value: fmt(stats.income),   icon: '↑', cls: 'income',      sub: 'All sources this month' },
-    { label: 'Monthly Expenses',   value: fmt(stats.expenses), icon: '↓', cls: 'expense',     sub: 'Total spent this month' },
-    { label: 'Saved & Invested',   value: fmt(stats.saved),    icon: '◆', cls: 'saved',       sub: 'Savings + investments' },
-    { label: 'Cash Balance',       value: fmt(stats.cash),     icon: '◈', cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg', sub: stats.cash >= 0 ? 'Available cash' : 'Overspent!' },
+    { label: 'Monthly Income',     value: fmt(stats.income),   cls: 'income',      sub: 'All sources this month' },
+    { label: 'Monthly Expenses',   value: fmt(stats.expenses), cls: 'expense',     sub: 'Total spent this month' },
+    { label: 'Saved & Invested',   value: fmt(stats.saved),    cls: 'saved',       sub: 'Savings + investments' },
+    { label: 'Cash Balance',       value: fmt(stats.cash),     cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg', sub: stats.cash >= 0 ? 'Available cash' : 'Overspent!' },
   ];
 
   return (
@@ -126,12 +127,9 @@ export default function Dashboard({ transactions, budgets }) {
       <div className="stats-grid">
         {statCards.map(card => (
           <div key={card.label} className={`stat-card ${card.cls}`}>
-            <div className="stat-icon-wrap"><span className="stat-icon">{card.icon}</span></div>
-            <div className="stat-body">
-              <span className="stat-label">{card.label}</span>
-              <span className="stat-value">{card.value}</span>
-              <span className="stat-sub">{card.sub}</span>
-            </div>
+            <span className="stat-label">{card.label}</span>
+            <span className="stat-value">{card.value}</span>
+            <span className="stat-sub">{card.sub}</span>
           </div>
         ))}
       </div>
@@ -147,27 +145,27 @@ export default function Dashboard({ transactions, budgets }) {
             <AreaChart data={monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="gIncome"  x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#10b981" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="5%"  stopColor="#00a854" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="#00a854" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                  <stop offset="5%"  stopColor="#f04545" stopOpacity={0.12} />
+                  <stop offset="95%" stopColor="#f04545" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gSavings" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#8b5cf6" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%"  stopColor="#06b6d4" stopOpacity={0.12} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1d2e4a" />
-              <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} />
+              <XAxis dataKey="month" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
                 tickFormatter={v => v >= 1000 ? `${v/1000}k` : v} />
               <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '13px', paddingTop: '8px' }} />
-              <Area type="monotone" dataKey="Income"   stroke="#10b981" fill="url(#gIncome)"  strokeWidth={2.5} dot={{ r: 4, fill: '#10b981',  strokeWidth: 0 }} activeDot={{ r: 6 }} />
-              <Area type="monotone" dataKey="Expenses" stroke="#ef4444" fill="url(#gExpense)" strokeWidth={2.5} dot={{ r: 4, fill: '#ef4444',  strokeWidth: 0 }} activeDot={{ r: 6 }} />
-              <Area type="monotone" dataKey="Savings"  stroke="#8b5cf6" fill="url(#gSavings)" strokeWidth={2.5} dot={{ r: 4, fill: '#8b5cf6',  strokeWidth: 0 }} activeDot={{ r: 6 }} />
+              <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
+              <Area type="monotone" dataKey="Income"   stroke="#00a854" fill="url(#gIncome)"  strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#00a854', strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="Expenses" stroke="#f04545" fill="url(#gExpense)" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#f04545', strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="Savings"  stroke="#06b6d4" fill="url(#gSavings)" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#06b6d4', strokeWidth: 0 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -183,7 +181,7 @@ export default function Dashboard({ transactions, budgets }) {
                 <PieChart>
                   <Pie data={expenseCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
                     dataKey="value" paddingAngle={3}>
-                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="transparent" />)}
+                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
                   </Pie>
                   <Tooltip content={<PieTooltip />} />
                 </PieChart>
@@ -212,14 +210,14 @@ export default function Dashboard({ transactions, budgets }) {
           {budgetComparison.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={budgetComparison} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1d2e4a" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false}
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
                   tickFormatter={v => `${v}`} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#94a3b8', fontSize: '13px', paddingTop: '8px' }} />
-                <Bar dataKey="budget" name="Budget" fill="#6366f1" opacity={0.55} radius={[6,6,0,0]} maxBarSize={40} />
-                <Bar dataKey="spent"  name="Spent"  fill="#f59e0b" radius={[6,6,0,0]} maxBarSize={40} />
+                <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
+                <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={40} />
+                <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
           ) : <div className="empty-state-sm">No budgets set for this month</div>}
@@ -237,7 +235,7 @@ export default function Dashboard({ transactions, budgets }) {
                 <PieChart>
                   <Pie data={savingsCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
                     dataKey="value" paddingAngle={3}>
-                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="transparent" />)}
+                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
                   </Pie>
                   <Tooltip content={<PieTooltip />} />
                 </PieChart>
@@ -267,8 +265,8 @@ export default function Dashboard({ transactions, budgets }) {
             const cat = getCategoryInfo(t.category);
             return (
               <div key={t.id} className="recent-item">
-                <span className="recent-icon" style={{ background: cat.color + '22', color: cat.color }}>
-                  {cat.icon}
+                <span className="recent-icon">
+                  <CategoryIcon name={t.category} size={16} />
                 </span>
                 <div className="recent-info">
                   <span className="recent-desc">{t.description}</span>

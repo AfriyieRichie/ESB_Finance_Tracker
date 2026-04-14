@@ -3,37 +3,37 @@ import { useState, useEffect, useCallback } from 'react';
 // ─── Category Definitions ──────────────────────────────────────────────────
 
 export const EXPENSE_CATEGORIES = [
-  { name: 'Housing',        icon: '🏠', color: '#6366f1' },
-  { name: 'Food & Dining',  icon: '🍔', color: '#f59e0b' },
-  { name: 'Transportation', icon: '🚗', color: '#06b6d4' },
-  { name: 'Entertainment',  icon: '🎬', color: '#8b5cf6' },
-  { name: 'Healthcare',     icon: '💊', color: '#10b981' },
-  { name: 'Shopping',       icon: '🛍️', color: '#ec4899' },
-  { name: 'Utilities',      icon: '⚡', color: '#f97316' },
-  { name: 'Education',      icon: '📚', color: '#3b82f6' },
-  { name: 'Personal Care',  icon: '✨', color: '#a78bfa' },
-  { name: 'Other',          icon: '📦', color: '#94a3b8' },
+  { name: 'Housing',        icon: '🏠', color: '#00e676' },
+  { name: 'Food & Dining',  icon: '🍔', color: '#06b6d4' },
+  { name: 'Transportation', icon: '🚗', color: '#2affa0' },
+  { name: 'Entertainment',  icon: '🎬', color: '#4ade80' },
+  { name: 'Healthcare',     icon: '💊', color: '#34d399' },
+  { name: 'Shopping',       icon: '🛍️', color: '#00b85a' },
+  { name: 'Utilities',      icon: '⚡', color: '#6ee7b7' },
+  { name: 'Education',      icon: '📚', color: '#00cc6a' },
+  { name: 'Personal Care',  icon: '✨', color: '#86efac' },
+  { name: 'Other',          icon: '📦', color: '#7db896' },
 ];
 
 export const INCOME_CATEGORIES = [
-  { name: 'Salary',         icon: '💼', color: '#10b981' },
-  { name: 'Dividend',       icon: '📈', color: '#6366f1' },
-  { name: 'Interest',       icon: '🏦', color: '#06b6d4' },
-  { name: 'Business',       icon: '🏢', color: '#f59e0b' },
-  { name: 'Freelance',      icon: '💻', color: '#8b5cf6' },
-  { name: 'Rental',         icon: '🏡', color: '#ec4899' },
-  { name: 'Others',         icon: '📦', color: '#94a3b8' },
+  { name: 'Salary',         icon: '💼', color: '#00e676' },
+  { name: 'Dividend',       icon: '📈', color: '#2affa0' },
+  { name: 'Interest',       icon: '🏦', color: '#4ade80' },
+  { name: 'Business',       icon: '🏢', color: '#06b6d4' },
+  { name: 'Freelance',      icon: '💻', color: '#34d399' },
+  { name: 'Rental',         icon: '🏡', color: '#00b85a' },
+  { name: 'Others',         icon: '📦', color: '#7db896' },
 ];
 
 export const SAVINGS_CATEGORIES = [
-  { name: 'Emergency Fund', icon: '🛡️', color: '#10b981' },
-  { name: 'Stock Portfolio',icon: '📊', color: '#6366f1' },
-  { name: 'Pension Fund',   icon: '👴', color: '#8b5cf6' },
-  { name: 'Fixed Deposit',  icon: '🏦', color: '#06b6d4' },
-  { name: 'Cryptocurrency', icon: '₿',  color: '#f59e0b' },
-  { name: 'Real Estate',    icon: '🏡', color: '#ec4899' },
-  { name: 'Mutual Funds',   icon: '💹', color: '#f97316' },
-  { name: 'Others',         icon: '💰', color: '#94a3b8' },
+  { name: 'Emergency Fund', icon: '🛡️', color: '#00e676' },
+  { name: 'Stock Portfolio',icon: '📊', color: '#2affa0' },
+  { name: 'Pension Fund',   icon: '👴', color: '#06b6d4' },
+  { name: 'Fixed Deposit',  icon: '🏦', color: '#4ade80' },
+  { name: 'Cryptocurrency', icon: '₿',  color: '#34d399' },
+  { name: 'Real Estate',    icon: '🏡', color: '#00b85a' },
+  { name: 'Mutual Funds',   icon: '💹', color: '#6ee7b7' },
+  { name: 'Others',         icon: '💰', color: '#7db896' },
 ];
 
 // Backward-compat alias used by Budget (expense-only budgets)

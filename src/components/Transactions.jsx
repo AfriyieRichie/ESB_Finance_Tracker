@@ -1,6 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, Calendar, ChevronDown, ClipboardList } from 'lucide-react';
 import { ALL_CATEGORIES, getCategoriesForType, getCategoryInfo } from '../hooks/useFinanceData';
 import { fmt } from '../utils';
+import CategoryIcon from './CategoryIcon';
+import CategorySelect from './CategorySelect';
 
 function TransactionModal({ onSave, onClose }) {
   const now = new Date();
@@ -79,11 +82,7 @@ function TransactionModal({ onSave, onClose }) {
                type === 'savings' ? 'Account / Instrument' :
                'Category'}
             </label>
-            <select value={category} onChange={e => setCategory(e.target.value)}>
-              {cats.map(c => (
-                <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-              ))}
-            </select>
+            <CategorySelect categories={cats} value={category} onChange={setCategory} />
           </div>
 
           <div className="form-actions">
@@ -92,6 +91,52 @@ function TransactionModal({ onSave, onClose }) {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function CategoryDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = ALL_CATEGORIES.find(c => c.name === value);
+
+  return (
+    <div className="cat-dropdown" ref={ref}>
+      <button className="cat-dropdown-trigger" onClick={() => setOpen(o => !o)}>
+        <span className="cat-dropdown-selected">
+          {value === 'All' ? (
+            <span className="cat-dropdown-label">All Categories</span>
+          ) : (
+            <>
+              <CategoryIcon name={value} size={13} />
+              <span className="cat-dropdown-label">{value}</span>
+            </>
+          )}
+        </span>
+        <ChevronDown size={13} strokeWidth={1.6} color="#c8ddd5"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.18s ease' }} />
+      </button>
+      {open && (
+        <div className="cat-dropdown-menu">
+          <div className="cat-dropdown-item" onClick={() => { onChange('All'); setOpen(false); }}>
+            <span className="cat-dropdown-label" style={{ paddingLeft: 2 }}>All Categories</span>
+          </div>
+          {ALL_CATEGORIES.map(c => (
+            <div key={c.name} className={`cat-dropdown-item ${value === c.name ? 'active' : ''}`}
+              onClick={() => { onChange(c.name); setOpen(false); }}>
+              <CategoryIcon name={c.name} size={13} />
+              <span className="cat-dropdown-label">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -129,23 +174,24 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
     <div className="transactions-page">
       <div className="page-header">
         <h2>Transactions</h2>
-        <button className="btn-primary" onClick={() => setShowModal(true)}>
-          <span>+</span> Add Transaction
+        <button className="btn-pill" onClick={() => setShowModal(true)}>
+          + Add Transaction
         </button>
       </div>
 
       {/* Filters */}
       <div className="filters-bar">
-        <input className="search-input" type="text" placeholder="🔍 Search descriptions..."
-          value={search} onChange={e => setSearch(e.target.value)} />
-        <input className="filter-month" type="month" value={filterMonth}
-          onChange={e => setFilterMonth(e.target.value)} />
-        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-          <option value="All">All Categories</option>
-          {ALL_CATEGORIES.map(c => (
-            <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-          ))}
-        </select>
+        <div className="search-wrap">
+          <Search size={15} strokeWidth={1.6} color="#c8ddd5" className="search-icon" />
+          <input className="search-input" type="text" placeholder="Search descriptions..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div className="date-wrap">
+          <Calendar size={15} strokeWidth={1.6} color="#c8ddd5" className="date-icon" />
+          <input className="filter-month" type="month" value={filterMonth}
+            onChange={e => setFilterMonth(e.target.value)} />
+        </div>
+        <CategoryDropdown value={filterCategory} onChange={setFilterCategory} />
         <select value={filterType} onChange={e => setFilterType(e.target.value)}>
           <option value="All">All Types</option>
           <option value="income">↑ Income</option>
@@ -173,7 +219,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📋</div>
+          <div className="empty-icon"><ClipboardList size={48} strokeWidth={1.2} color="#456054" /></div>
           <h3>No transactions found</h3>
           <p>Try adjusting your filters or add a new transaction.</p>
         </div>
@@ -200,8 +246,9 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
                     </td>
                     <td className="tx-desc">{t.description}</td>
                     <td className="tx-cat">
-                      <span className="cat-badge" style={{ background: cat.color + '22', color: cat.color }}>
-                        {cat.icon} {t.category}
+                      <span className="cat-badge">
+                        <CategoryIcon name={t.category} size={13} />
+                        {t.category}
                       </span>
                     </td>
                     <td>

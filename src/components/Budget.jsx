@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react';
+import { Wallet } from 'lucide-react';
 import { CATEGORIES } from '../hooks/useFinanceData';
 import { fmt } from '../utils';
+import CategoryIcon from './CategoryIcon';
+import CategorySelect from './CategorySelect';
 
 function BudgetModal({ month, existing, onSave, onClose }) {
   const [category, setCategory] = useState(existing?.category || CATEGORIES[0].name);
@@ -23,11 +26,12 @@ function BudgetModal({ month, existing, onSave, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
             <label>Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} disabled={!!existing}>
-              {CATEGORIES.filter(c => c.name !== 'Other').map(c => (
-                <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-              ))}
-            </select>
+            <CategorySelect
+              categories={CATEGORIES.filter(c => c.name !== 'Other')}
+              value={category}
+              onChange={setCategory}
+              disabled={!!existing}
+            />
           </div>
           <div className="form-group">
             <label>Monthly Budget (GH₵)</label>
@@ -132,7 +136,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                 className="progress-bar-fill"
                 style={{
                   width: `${Math.min((totalSpent / totalBudget) * 100, 100)}%`,
-                  background: totalSpent / totalBudget > 0.9 ? '#ef4444' : totalSpent / totalBudget > 0.7 ? '#f59e0b' : '#10b981'
+                  background: '#ffffff'
                 }}
               />
             </div>
@@ -146,7 +150,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
       {/* Budget Cards */}
       {monthBudgets.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">💰</div>
+          <div className="empty-icon"><Wallet size={48} strokeWidth={1.2} color="#456054" /></div>
           <h3>No budgets set</h3>
           <p>Set monthly budgets to track your spending against goals.</p>
           <button className="btn-primary" onClick={openAdd}>Add Your First Budget</button>
@@ -159,15 +163,20 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
             const pct   = Math.min((spent / b.amount) * 100, 100);
             const over  = spent > b.amount;
             const warn  = pct >= 70 && !over;
-            const barColor = over ? '#ef4444' : warn ? '#f59e0b' : '#10b981';
+            const barColor = '#ffffff';
 
             return (
               <div key={b.id} className="budget-card">
                 <div className="bc-header">
                   <div className="bc-cat">
-                    <span className="bc-icon" style={{ background: (cat?.color || '#94a3b8') + '22', color: cat?.color || '#94a3b8' }}>
-                      {cat?.icon || '📦'}
-                    </span>
+                    <div
+                      className="bc-icon-ring"
+                      style={{ '--pct': `${pct}%`, '--ring-color': '#00a854' }}
+                    >
+                      <div className="bc-icon-inner">
+                        <CategoryIcon name={b.category} size={19} />
+                      </div>
+                    </div>
                     <span className="bc-name">{b.category}</span>
                   </div>
                   <div className="bc-actions">
