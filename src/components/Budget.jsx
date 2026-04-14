@@ -135,8 +135,8 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
           <button className="nav-btn" onClick={nextMonth}>›</button>
         </div>
         {canAdd && (
-          <button className="btn-primary" onClick={openAdd}>
-            <span>+</span> Add Budget
+          <button className="btn-pill" onClick={openAdd}>
+            + Add Budget
           </button>
         )}
       </div>
@@ -181,7 +181,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
           <div className="empty-icon"><Wallet size={48} strokeWidth={1.2} color="#456054" /></div>
           <h3>No budgets set</h3>
           <p>Set monthly budgets to track your spending against goals.</p>
-          <button className="btn-primary" onClick={openAdd}>Add Your First Budget</button>
+          <button className="btn-pill" onClick={openAdd}>Add Your First Budget</button>
         </div>
       ) : (
         <div className="budget-grid">
