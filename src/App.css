@@ -647,9 +647,9 @@
   font-size: 13px;
 }
 .tx-count   { color: var(--text-3); }
-.tx-income  { color: var(--success);   font-weight: 600; }
+.tx-income  { color: var(--text-1);    font-weight: 600; }
 .tx-expense { color: var(--danger);    font-weight: 600; }
-.tx-savings { color: var(--info);       font-weight: 600; }
+.tx-savings { color: var(--text-1);    font-weight: 600; }
 .tx-net { font-weight: 700; margin-left: auto; }
 .tx-net.pos { color: var(--success); }
 .tx-net.neg { color: var(--danger); }
@@ -714,9 +714,9 @@
   margin-top: 2px;
   letter-spacing: 0.2px;
 }
-.tx-amount.income  { color: var(--success); }
+.tx-amount.income  { color: var(--text-1); }
 .tx-amount.expense { color: var(--danger); }
-.tx-amount.savings { color: var(--info); }
+.tx-amount.savings { color: var(--text-1); }
 
 /* ─── Category Select (modal) ────────────────────────── */
 .cat-select { position: relative; width: 100%; }
