@@ -50,8 +50,10 @@ export default function Dashboard({ transactions, budgets }) {
     const income  = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
     const expenses= txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const saved   = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
-    const cash    = income - expenses - saved;   // what's left in pocket
-    return { income, expenses, saved, cash };
+    const cash    = income - expenses - saved;
+    const expensePct = income > 0 ? Math.round((expenses / income) * 100) : null;
+    const savedPct   = income > 0 ? Math.round((saved   / income) * 100) : null;
+    return { income, expenses, saved, cash, expensePct, savedPct };
   }, [transactions, currentMonth]);
 
   // ── Expense breakdown (donut) ──────────────────────────────────────────
@@ -108,10 +110,10 @@ export default function Dashboard({ transactions, budgets }) {
   );
 
   const statCards = [
-    { label: 'Monthly Income',     value: fmt(stats.income),   cls: 'income',      sub: 'All sources this month' },
-    { label: 'Monthly Expenses',   value: fmt(stats.expenses), cls: 'expense',     sub: 'Total spent this month' },
-    { label: 'Saved & Invested',   value: fmt(stats.saved),    cls: 'saved',       sub: 'Savings + investments' },
-    { label: 'Cash Balance',       value: fmt(stats.cash),     cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg', sub: stats.cash >= 0 ? 'Available cash' : 'Overspent!' },
+    { label: 'Monthly Income',   value: fmt(stats.income),   cls: 'income',      sub: 'All sources this month' },
+    { label: 'Monthly Expenses', value: fmt(stats.expenses), cls: 'expense',     sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
+    { label: 'Saved & Invested', value: fmt(stats.saved),    cls: 'saved',       sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
+    { label: 'Cash Balance',     value: fmt(stats.cash),     cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg', sub: stats.cash >= 0 ? 'Available cash' : 'Overspent!' },
   ];
 
   return (
@@ -129,7 +131,12 @@ export default function Dashboard({ transactions, budgets }) {
           <div key={card.label} className={`stat-card ${card.cls}`}>
             <span className="stat-label">{card.label}</span>
             <span className="stat-value">{card.value}</span>
-            <span className="stat-sub">{card.sub}</span>
+            <div className="stat-footer">
+              <span className="stat-sub">{card.sub}</span>
+              {card.pct !== null && card.pct !== undefined && (
+                <span className={`stat-pct-badge ${card.pctCls}`}>{card.pct}% of income</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
