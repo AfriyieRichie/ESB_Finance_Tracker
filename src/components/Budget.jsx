@@ -17,15 +17,15 @@ const TYPE_CONFIG = {
 function BudgetModal({ month, existing, onSave, onClose }) {
   const [type, setType]         = useState(existing?.type || 'expense');
   const [category, setCategory] = useState(
-    existing?.category || getCategoriesForType(existing?.type || 'expense').filter(c => c.name !== 'Other' && c.name !== 'Others')[0]?.name || ''
+    existing?.category || getCategoriesForType(existing?.type || 'expense')[0]?.name || ''
   );
   const [amount, setAmount] = useState(existing?.amount || '');
 
-  const cats = getCategoriesForType(type).filter(c => c.name !== 'Other' && c.name !== 'Others');
+  const cats = getCategoriesForType(type);
 
   const handleTypeChange = (t) => {
     setType(t);
-    setCategory(getCategoriesForType(t).filter(c => c.name !== 'Other' && c.name !== 'Others')[0]?.name || '');
+    setCategory(getCategoriesForType(t)[0]?.name || '');
   };
 
   const handleSubmit = (e) => {
@@ -120,9 +120,9 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
 
   const alreadySet = new Set(monthBudgets.map(b => `${b.type || 'expense'}:${b.category}`));
   const allPossible = [
-    ...EXPENSE_CATEGORIES.filter(c => c.name !== 'Other').map(c => `expense:${c.name}`),
-    ...INCOME_CATEGORIES.filter(c => c.name !== 'Others').map(c => `income:${c.name}`),
-    ...SAVINGS_CATEGORIES.filter(c => c.name !== 'Others').map(c => `savings:${c.name}`),
+    ...EXPENSE_CATEGORIES.map(c => `expense:${c.name}`),
+    ...INCOME_CATEGORIES.map(c => `income:${c.name}`),
+    ...SAVINGS_CATEGORIES.map(c => `savings:${c.name}`),
   ];
   const canAdd = allPossible.some(key => !alreadySet.has(key));
 

@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank } from 'lucide-react';
+import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight } from 'lucide-react';
 
-const TYPE_ICON = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank };
-const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings' };
+const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight };
+const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer' };
 function TypeBadge({ type }) {
   const Icon = TYPE_ICON[type] || TrendingDown;
   return (
@@ -17,7 +17,7 @@ import { fmt } from '../utils';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
-function TransactionModal({ onSave, onClose, transactions, accounts, debts, assets }) {
+function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfer, budgets }) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
@@ -29,11 +29,18 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [debtId,    setDebtId]    = useState('');
   const [assetId,   setAssetId]   = useState('');
-  const [warning,   setWarning]   = useState(null);
+  const [warning,   setWarning]   = useState(null); // { account, shortfall }
+  const [miniFrom,  setMiniFrom]  = useState('');
+  const [miniAmt,   setMiniAmt]   = useState('');
+  const [miniBusy,  setMiniBusy]  = useState(false);
 
   const cats        = getCategoriesForType(type);
   const activeAssets = assets.filter(a => a.status === 'active');
   const isDebtRepay  = category === 'Debt Repayment';
+
+  const hasBudget = budgets.some(
+    b => b.category === category && b.month === date.slice(0, 7) && (b.type || 'expense') === type
+  );
 
   const handleTypeChange = (t) => {
     setType(t);
@@ -43,13 +50,11 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
     setAssetId('');
   };
 
-  const getMonthBalance = (forDate) => {
-    const month = forDate.slice(0, 7); // 'YYYY-MM'
-    const monthTx = transactions.filter(t => t.date.startsWith(month));
-    const income   = monthTx.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-    const expenses = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const savings  = monthTx.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
-    return income - expenses - savings;
+  const buildTx = () => {
+    const tx = { description, amount: Number(amount), type, category, date, accountId };
+    if (isDebtRepay && debtId) tx.debtId  = debtId;
+    if (type === 'savings' && assetId) tx.assetId = assetId;
+    return tx;
   };
 
   const handleSubmit = (e) => {
@@ -57,30 +62,35 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
     if (!description.trim() || !amount || isNaN(amount) || Number(amount) <= 0) return;
     if (!accountId) return;
 
-    // Warn if outflow would push cash negative
+    // Warn if outflow exceeds selected account balance
     if (type === 'expense' || type === 'savings') {
-      const currentBalance = getMonthBalance(date);
-      const afterBalance   = currentBalance - Number(amount);
-      if (afterBalance < 0) {
-        setWarning({ currentBalance, shortfall: Math.abs(afterBalance) });
+      const selectedAccount = accounts.find(a => a.id === accountId);
+      if (selectedAccount && selectedAccount.balance < Number(amount)) {
+        setWarning({ account: selectedAccount, shortfall: Number(amount) - selectedAccount.balance });
+        setMiniFrom('');
+        setMiniAmt('');
         return;
       }
     }
 
-    const tx = { description, amount: Number(amount), type, category, date, accountId };
-    if (isDebtRepay && debtId)              tx.debtId  = debtId;
-    if (type === 'savings' && assetId)      tx.assetId = assetId;
-
-    onSave(tx);
+    onSave(buildTx());
     onClose();
   };
 
-  const confirmAnyway = () => {
-    const tx = { description, amount: Number(amount), type, category, date, accountId };
-    if (isDebtRepay && debtId)              tx.debtId  = debtId;
-    if (type === 'savings' && assetId)      tx.assetId = assetId;
-    onSave(tx);
-    onClose();
+  const confirmAnyway = () => { onSave(buildTx()); onClose(); };
+
+  const handleMiniTransfer = async () => {
+    if (!miniFrom || !miniAmt) return;
+    setMiniBusy(true);
+    await addTransfer({
+      fromAccountId: miniFrom,
+      toAccountId:   accountId,
+      amount:        parseFloat(miniAmt),
+      description:   'Transfer',
+      date,
+    });
+    setMiniBusy(false);
+    setWarning(null);
   };
 
   const typeConfig = {
@@ -89,9 +99,7 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
     savings: { label: '◆ Save / Invest', activeClass: 'savings-active' },
   };
 
-  const monthLabel = date
-    ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : '';
+  const otherAccounts = accounts.filter(a => a.id !== accountId);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -104,16 +112,41 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
         {warning ? (
           <div className="modal-warning-body">
             <div className="modal-warning-icon">⚠</div>
-            <h4 className="modal-warning-title">Cash Balance Will Go Negative</h4>
+            <h4 className="modal-warning-title">Insufficient Account Balance</h4>
             <p className="modal-warning-text">
-              Your current cash balance for <strong>{monthLabel}</strong> is{' '}
-              <span className="mw-balance">GH₵ {warning.currentBalance.toFixed(2)}</span>.
-              Adding this {type} will leave you{' '}
-              <span className="mw-shortfall">GH₵ {warning.shortfall.toFixed(2)} short</span>.
+              <strong>{warning.account.name}</strong> only has{' '}
+              <span className="mw-balance">{fmt(warning.account.balance)}</span> available.
+              You need{' '}
+              <span className="mw-shortfall">{fmt(warning.shortfall)} more</span> to complete this transaction.
             </p>
-            <p className="modal-warning-hint">
-              Consider recording additional income first to cover the shortfall.
-            </p>
+            {otherAccounts.length > 0 && (
+              <>
+                <p className="modal-warning-hint">Top up from another account first:</p>
+                <div className="mini-transfer">
+                  <select value={miniFrom} onChange={e => setMiniFrom(e.target.value)}>
+                    <option value="">— From account —</option>
+                    {otherAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number" min="0.01" step="0.01"
+                    placeholder={fmt(warning.shortfall)}
+                    value={miniAmt}
+                    onChange={e => setMiniAmt(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ whiteSpace: 'nowrap' }}
+                    disabled={!miniFrom || !miniAmt || miniBusy}
+                    onClick={handleMiniTransfer}
+                  >
+                    {miniBusy ? '…' : 'Transfer'}
+                  </button>
+                </div>
+              </>
+            )}
             <div className="modal-warning-actions">
               <button className="btn-secondary" onClick={() => setWarning(null)}>← Go Back</button>
               <button className="btn-warning" onClick={confirmAnyway}>Proceed Anyway</button>
@@ -160,6 +193,12 @@ function TransactionModal({ onSave, onClose, transactions, accounts, debts, asse
                  'Category'}
               </label>
               <CategorySelect categories={cats} value={category} onChange={v => { setCategory(v); setDebtId(''); }} />
+              {!hasBudget && (
+                <p className="no-budget-hint">
+                  No budget set for <strong>{category}</strong> in this month.{' '}
+                  <span>Go to the Budget tab to add one.</span>
+                </p>
+              )}
             </div>
 
             <div className="form-group">
@@ -255,13 +294,15 @@ function CategoryDropdown({ value, onChange, categories }) {
   );
 }
 
-export default function Transactions({ transactions, addTransaction, deleteTransaction, accounts, debts, assets }) {
+export default function Transactions({ transactions, addTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
   const now = new Date();
   const [showModal, setShowModal]           = useState(false);
   const [filterMonth, setFilterMonth]       = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterType, setFilterType]         = useState('All');
   const [search, setSearch]                 = useState('');
+
+  const acctMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a])), [accounts]);
 
   const filtered = useMemo(() => {
     return transactions
@@ -279,8 +320,8 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
 
-  const typeLabelMap = { income: '↑ Income', expense: '↓ Expense', savings: '◆ Savings' };
-  const typeSignMap  = { income: '+', expense: '-', savings: '→ ' };
+  const typeLabelMap = { income: '↑ Income', expense: '↓ Expense', savings: '◆ Savings', transfer: '⇄ Transfer' };
+  const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
 
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || search;
 
@@ -326,6 +367,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
           <option value="income">↑ Income</option>
           <option value="expense">↓ Expense</option>
           <option value="savings">◆ Savings</option>
+          <option value="transfer">⇄ Transfer</option>
         </select>
         {isFiltered && (
           <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setSearch(''); }}>
@@ -367,7 +409,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
             </thead>
             <tbody>
               {filtered.map(t => {
-                const cat = getCategoryInfo(t.category);
+                const isTransfer = t.type === 'transfer';
                 return (
                   <tr key={t.id} className="tx-row">
                     <td className="tx-date">
@@ -375,10 +417,17 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
                     </td>
                     <td className="tx-desc">{t.description}</td>
                     <td className="tx-cat">
-                      <span className="cat-badge">
-                        <CategoryIcon name={t.category} size={13} />
-                        {t.category}
-                      </span>
+                      {isTransfer ? (
+                        <span className="cat-badge">
+                          <ArrowLeftRight size={13} strokeWidth={1.6} color="#c8ddd5" />
+                          {acctMap[t.fromAccountId]?.name || '?'} → {acctMap[t.toAccountId]?.name || '?'}
+                        </span>
+                      ) : (
+                        <span className="cat-badge">
+                          <CategoryIcon name={t.category} size={13} />
+                          {t.category}
+                        </span>
+                      )}
                     </td>
                     <td><TypeBadge type={t.type} /></td>
                     <td className={`tx-amount ${t.type}`}>
@@ -399,10 +448,11 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
         <TransactionModal
           onSave={addTransaction}
           onClose={() => setShowModal(false)}
-          transactions={transactions}
           accounts={accounts}
           debts={debts}
           assets={assets}
+          addTransfer={addTransfer}
+          budgets={budgets}
         />
       )}
     </div>

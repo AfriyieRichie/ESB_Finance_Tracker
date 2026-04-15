@@ -28,7 +28,7 @@ function AppContent() {
 
   const {
     transactions, budgets, accounts, debts, assets, loading,
-    addTransaction, deleteTransaction,
+    addTransaction, deleteTransaction, addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
@@ -139,6 +139,8 @@ function AppContent() {
                 accounts={accounts}
                 debts={debts}
                 assets={assets}
+                addTransfer={addTransfer}
+                budgets={budgets}
               />
             )}
             {activeTab === 'accounts' && (
@@ -156,6 +158,7 @@ function AppContent() {
                 updateAssetValue={updateAssetValue}
                 cashOutAsset={cashOutAsset}
                 deleteAsset={deleteAsset}
+                addTransfer={addTransfer}
               />
             )}
           </>

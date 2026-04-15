@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react';
 import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
 import { fmt } from '../utils';
@@ -527,9 +527,97 @@ function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
   );
 }
 
+// ─── Transfer Modal ────────────────────────────────────────────────────────
+
+function TransferModal({ accounts, onTransfer, onClose }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [fromId, setFromId] = useState('');
+  const [toId,   setToId]   = useState('');
+  const [amount, setAmount] = useState('');
+  const [desc,   setDesc]   = useState('');
+  const [date,   setDate]   = useState(today);
+  const [error,  setError]  = useState('');
+  const [busy,   setBusy]   = useState(false);
+
+  const fromAcct = accounts.find(a => a.id === fromId);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!fromId || !toId || fromId === toId || !amount) return;
+    if (fromAcct && parseFloat(amount) > fromAcct.balance) {
+      setError(`Insufficient balance. ${fromAcct.name} only has ${fmt(fromAcct.balance)}.`);
+      return;
+    }
+    setBusy(true);
+    await onTransfer({
+      fromAccountId: fromId,
+      toAccountId:   toId,
+      amount:        parseFloat(amount),
+      description:   desc.trim() || 'Transfer',
+      date,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Transfer Funds</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="modal-form">
+          <div className="form-group">
+            <label>From Account</label>
+            <select value={fromId} onChange={e => { setFromId(e.target.value); setError(''); }} required>
+              <option value="">— Select account —</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>To Account</label>
+            <select value={toId} onChange={e => { setToId(e.target.value); setError(''); }} required>
+              <option value="">— Select account —</option>
+              {accounts.filter(a => a.id !== fromId).map(a => (
+                <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Amount (GH₵)</label>
+              <input type="number" min="0.01" step="0.01" placeholder="0.00"
+                value={amount} onChange={e => { setAmount(e.target.value); setError(''); }} required />
+            </div>
+            <div className="form-group">
+              <label>Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Description (optional)</label>
+            <input type="text" placeholder="e.g. Moving savings to MoMo"
+              value={desc} onChange={e => setDesc(e.target.value)} />
+          </div>
+          {error && <p className="transfer-error">{error}</p>}
+          <div className="form-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary"
+              disabled={busy || !fromId || !toId || fromId === toId || !amount}>
+              Transfer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset }) {
+export default function Accounts({ accounts, debts, assets, addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
 
@@ -545,9 +633,16 @@ export default function Accounts({ accounts, debts, assets, addAccount, updateAc
     <div className="accounts-page">
       <div className="page-header">
         <h2>Accounts</h2>
-        <button className="btn-pill" onClick={() => setModal({ type: 'account' })}>
-          + Add Account
-        </button>
+        <div className="page-header-actions">
+          {accounts.length >= 2 && (
+            <button className="btn-ghost" onClick={() => setModal({ type: 'transfer' })}>
+              <ArrowLeftRight size={14} strokeWidth={1.6} color="#c8ddd5" /> Transfer
+            </button>
+          )}
+          <button className="btn-pill" onClick={() => setModal({ type: 'account' })}>
+            + Add Account
+          </button>
+        </div>
       </div>
 
       {/* ── Net Worth Hero ── */}
@@ -674,6 +769,9 @@ export default function Accounts({ accounts, debts, assets, addAccount, updateAc
       )}
       {modal?.type === 'asset' && (
         <AssetModal existing={modal.data} accounts={accounts} onSave={addAsset} onClose={close} />
+      )}
+      {modal?.type === 'transfer' && (
+        <TransferModal accounts={accounts} onTransfer={addTransfer} onClose={close} />
       )}
       {modal?.type === 'updateValue' && (
         <UpdateValueModal asset={modal.data} onSave={updateAssetValue} onClose={close} />

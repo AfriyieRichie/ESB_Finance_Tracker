@@ -189,27 +189,51 @@ export function useFinanceData(userId) {
     const batch = writeBatch(db);
     batch.delete(doc(db, 'users', userId, 'transactions', id));
 
-    // Reverse account balance
-    if (tx.accountId) {
-      const delta = tx.type === 'income' ? -tx.amount : tx.amount;
-      batch.update(doc(db, 'users', userId, 'accounts', tx.accountId), { balance: increment(delta) });
-    }
-
-    // Reverse debt reduction
-    if (tx.debtId) {
-      batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(tx.amount) });
-    }
-
-    // Reverse asset cost basis
-    if (tx.type === 'savings' && tx.assetId) {
-      batch.update(doc(db, 'users', userId, 'assets', tx.assetId), {
-        costBasis:    increment(-tx.amount),
-        currentValue: increment(-tx.amount),
-      });
+    if (tx.type === 'transfer') {
+      // Reverse both sides of the transfer
+      if (tx.fromAccountId) batch.update(doc(db, 'users', userId, 'accounts', tx.fromAccountId), { balance: increment(tx.amount) });
+      if (tx.toAccountId)   batch.update(doc(db, 'users', userId, 'accounts', tx.toAccountId),   { balance: increment(-tx.amount) });
+    } else {
+      // Reverse account balance for regular transactions
+      if (tx.accountId) {
+        const delta = tx.type === 'income' ? -tx.amount : tx.amount;
+        batch.update(doc(db, 'users', userId, 'accounts', tx.accountId), { balance: increment(delta) });
+      }
+      // Reverse debt reduction
+      if (tx.debtId) {
+        batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(tx.amount) });
+      }
+      // Reverse asset cost basis
+      if (tx.type === 'savings' && tx.assetId) {
+        batch.update(doc(db, 'users', userId, 'assets', tx.assetId), {
+          costBasis:    increment(-tx.amount),
+          currentValue: increment(-tx.amount),
+        });
+      }
     }
 
     await batch.commit();
   }, [userId, transactions]);
+
+  const addTransfer = useCallback(async ({ fromAccountId, toAccountId, amount, description, date }) => {
+    const batch = writeBatch(db);
+
+    const txRef = doc(collection(db, 'users', userId, 'transactions'));
+    batch.set(txRef, {
+      type:          'transfer',
+      description:   description || 'Transfer',
+      amount,
+      fromAccountId,
+      toAccountId,
+      accountId:     fromAccountId,
+      date,
+    });
+
+    batch.update(doc(db, 'users', userId, 'accounts', fromAccountId), { balance: increment(-amount) });
+    batch.update(doc(db, 'users', userId, 'accounts', toAccountId),   { balance: increment(amount) });
+
+    await batch.commit();
+  }, [userId]);
 
   // ── Budgets ─────────────────────────────────────────────────────────────
 
