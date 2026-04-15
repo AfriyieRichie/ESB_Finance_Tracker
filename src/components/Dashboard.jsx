@@ -47,13 +47,23 @@ export default function Dashboard({ transactions, budgets }) {
   // ── Current-month stats ────────────────────────────────────────────────
   const stats = useMemo(() => {
     const txs = transactions.filter(t => t.date.startsWith(currentMonth));
-    const income  = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-    const expenses= txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const saved   = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
-    const cash    = income - expenses - saved;
+    const income   = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
+    const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const saved    = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
+    const thisMonthNet = income - expenses - saved;
+
+    // Opening balance — cumulative net of all months before this one
+    const prevTxs       = transactions.filter(t => t.date.slice(0, 7) < currentMonth);
+    const prevIncome    = prevTxs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
+    const prevExpenses  = prevTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const prevSaved     = prevTxs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
+    const openingBalance = prevIncome - prevExpenses - prevSaved;
+
+    const cash = openingBalance + thisMonthNet;
+
     const expensePct = income > 0 ? Math.round((expenses / income) * 100) : null;
     const savedPct   = income > 0 ? Math.round((saved   / income) * 100) : null;
-    return { income, expenses, saved, cash, expensePct, savedPct };
+    return { income, expenses, saved, cash, openingBalance, expensePct, savedPct };
   }, [transactions, currentMonth]);
 
   // ── Expense breakdown (donut) ──────────────────────────────────────────
@@ -113,7 +123,14 @@ export default function Dashboard({ transactions, budgets }) {
     { label: 'Monthly Income',   value: fmt(stats.income),   cls: 'income',      sub: 'All sources this month' },
     { label: 'Monthly Expenses', value: fmt(stats.expenses), cls: 'expense',     sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
     { label: 'Saved & Invested', value: fmt(stats.saved),    cls: 'saved',       sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
-    { label: 'Cash Balance',     value: fmt(stats.cash),     cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg', sub: stats.cash >= 0 ? 'Available cash' : 'Overspent!' },
+    {
+      label: 'Cash Balance',
+      value: fmt(stats.cash),
+      cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg',
+      sub: stats.openingBalance !== 0
+        ? `${stats.openingBalance >= 0 ? '+' : ''}${fmt(stats.openingBalance)} brought forward`
+        : stats.cash >= 0 ? 'Available cash' : 'Overspent!',
+    },
   ];
 
   return (
