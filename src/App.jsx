@@ -5,6 +5,8 @@ import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Budget from './components/Budget';
 import Transactions from './components/Transactions';
+import Accounts from './components/Accounts';
+import OnboardingWizard from './components/OnboardingWizard';
 import { useFinanceData } from './hooks/useFinanceData';
 import './App.css';
 
@@ -12,18 +14,28 @@ const TABS = [
   { id: 'dashboard',    label: 'Dashboard',   icon: '◉' },
   { id: 'budget',       label: 'Budget',       icon: '◎' },
   { id: 'transactions', label: 'Transactions', icon: '≡' },
+  { id: 'accounts',     label: 'Accounts',     icon: '⬡' },
 ];
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY    = new Date().toISOString().slice(0, 10);
 const NUDGE_KEY = `nudge-dismissed-${TODAY}`;
+const ONBOARD_SKIP_KEY = 'onboarding-skipped';
 
 function AppContent() {
   const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNudge, setShowNudge] = useState(false);
-  const { transactions, budgets, loading, addTransaction, deleteTransaction, upsertBudget, deleteBudget } =
-    useFinanceData(currentUser?.uid);
 
+  const {
+    transactions, budgets, accounts, debts, assets, loading,
+    addTransaction, deleteTransaction,
+    upsertBudget, deleteBudget,
+    addAccount, updateAccount, deleteAccount,
+    addDebt, updateDebt, deleteDebt,
+    addAsset, updateAssetValue, cashOutAsset, deleteAsset,
+  } = useFinanceData(currentUser?.uid);
+
+  // Daily nudge
   useEffect(() => {
     if (loading) return;
     if (sessionStorage.getItem(NUDGE_KEY)) return;
@@ -31,14 +43,17 @@ function AppContent() {
     setShowNudge(!hasToday);
   }, [loading, transactions]);
 
-  const dismissNudge = () => {
-    sessionStorage.setItem(NUDGE_KEY, '1');
-    setShowNudge(false);
-  };
+  const dismissNudge = () => { sessionStorage.setItem(NUDGE_KEY, '1'); setShowNudge(false); };
+  const recordNow    = () => { dismissNudge(); setActiveTab('transactions'); };
 
-  const recordNow = () => {
-    dismissNudge();
-    setActiveTab('transactions');
+  // Onboarding
+  const showOnboarding = !loading && accounts.length === 0 && !sessionStorage.getItem(ONBOARD_SKIP_KEY);
+
+  const handleOnboardingComplete = async (newAccounts) => {
+    for (const acct of newAccounts) await addAccount(acct);
+  };
+  const handleOnboardingSkip = () => {
+    sessionStorage.setItem(ONBOARD_SKIP_KEY, '1');
   };
 
   if (!currentUser) return <Auth />;
@@ -76,9 +91,7 @@ function AppContent() {
             <span className="user-name">{currentUser.displayName || 'User'}</span>
             <span className="user-email">{currentUser.email}</span>
           </div>
-          <button className="logout-btn" onClick={logout} title="Sign out">
-            ⏻
-          </button>
+          <button className="logout-btn" onClick={logout} title="Sign out">⏻</button>
         </div>
       </header>
 
@@ -100,6 +113,11 @@ function AppContent() {
             <div className="data-spinner" />
             <p>Loading your data…</p>
           </div>
+        ) : showOnboarding ? (
+          <OnboardingWizard
+            onComplete={async (accts) => { await handleOnboardingComplete(accts); }}
+            onSkip={handleOnboardingSkip}
+          />
         ) : (
           <>
             {activeTab === 'dashboard' && (
@@ -118,6 +136,26 @@ function AppContent() {
                 transactions={transactions}
                 addTransaction={addTransaction}
                 deleteTransaction={deleteTransaction}
+                accounts={accounts}
+                debts={debts}
+                assets={assets}
+              />
+            )}
+            {activeTab === 'accounts' && (
+              <Accounts
+                accounts={accounts}
+                debts={debts}
+                assets={assets}
+                addAccount={addAccount}
+                updateAccount={updateAccount}
+                deleteAccount={deleteAccount}
+                addDebt={addDebt}
+                updateDebt={updateDebt}
+                deleteDebt={deleteDebt}
+                addAsset={addAsset}
+                updateAssetValue={updateAssetValue}
+                cashOutAsset={cashOutAsset}
+                deleteAsset={deleteAsset}
               />
             )}
           </>

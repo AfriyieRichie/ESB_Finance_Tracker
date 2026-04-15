@@ -17,23 +17,30 @@ import { fmt } from '../utils';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
-function TransactionModal({ onSave, onClose, transactions }) {
+function TransactionModal({ onSave, onClose, transactions, accounts, debts, assets }) {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
-  const [type, setType]         = useState('expense');
-  const [description, setDesc]  = useState('');
-  const [amount, setAmount]     = useState('');
-  const [date, setDate]         = useState(today);
-  const [category, setCategory] = useState('Food & Dining');
-  const [warning, setWarning]   = useState(null); // { currentBalance, shortfall }
+  const [type,      setType]      = useState('expense');
+  const [description, setDesc]   = useState('');
+  const [amount,    setAmount]    = useState('');
+  const [date,      setDate]      = useState(today);
+  const [category,  setCategory]  = useState('Food & Dining');
+  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
+  const [debtId,    setDebtId]    = useState('');
+  const [assetId,   setAssetId]   = useState('');
+  const [warning,   setWarning]   = useState(null);
 
-  const cats = getCategoriesForType(type);
+  const cats        = getCategoriesForType(type);
+  const activeAssets = assets.filter(a => a.status === 'active');
+  const isDebtRepay  = category === 'Debt Repayment';
 
   const handleTypeChange = (t) => {
     setType(t);
     setCategory(getCategoriesForType(t)[0].name);
     setWarning(null);
+    setDebtId('');
+    setAssetId('');
   };
 
   const getMonthBalance = (forDate) => {
@@ -48,8 +55,9 @@ function TransactionModal({ onSave, onClose, transactions }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!description.trim() || !amount || isNaN(amount) || Number(amount) <= 0) return;
+    if (!accountId) return;
 
-    // Only warn for outflows that could push cash negative
+    // Warn if outflow would push cash negative
     if (type === 'expense' || type === 'savings') {
       const currentBalance = getMonthBalance(date);
       const afterBalance   = currentBalance - Number(amount);
@@ -59,12 +67,19 @@ function TransactionModal({ onSave, onClose, transactions }) {
       }
     }
 
-    onSave({ description, amount: Number(amount), type, category, date });
+    const tx = { description, amount: Number(amount), type, category, date, accountId };
+    if (isDebtRepay && debtId)              tx.debtId  = debtId;
+    if (type === 'savings' && assetId)      tx.assetId = assetId;
+
+    onSave(tx);
     onClose();
   };
 
   const confirmAnyway = () => {
-    onSave({ description, amount: Number(amount), type, category, date });
+    const tx = { description, amount: Number(amount), type, category, date, accountId };
+    if (isDebtRepay && debtId)              tx.debtId  = debtId;
+    if (type === 'savings' && assetId)      tx.assetId = assetId;
+    onSave(tx);
     onClose();
   };
 
@@ -141,15 +156,53 @@ function TransactionModal({ onSave, onClose, transactions }) {
             <div className="form-group">
               <label>
                 {type === 'income'  ? 'Income Source' :
-                 type === 'savings' ? 'Account / Instrument' :
+                 type === 'savings' ? 'Savings Category' :
                  'Category'}
               </label>
-              <CategorySelect categories={cats} value={category} onChange={setCategory} />
+              <CategorySelect categories={cats} value={category} onChange={v => { setCategory(v); setDebtId(''); }} />
             </div>
+
+            <div className="form-group">
+              <label>{type === 'income' ? 'Receiving Account' : 'Paying From Account'}</label>
+              {accounts.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--warning)' }}>No accounts yet. Add one in the Accounts tab first.</p>
+              ) : (
+                <select value={accountId} onChange={e => setAccountId(e.target.value)} required>
+                  <option value="">— Select account —</option>
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {isDebtRepay && debts.length > 0 && (
+              <div className="form-group">
+                <label>Linked Debt (optional)</label>
+                <select value={debtId} onChange={e => setDebtId(e.target.value)}>
+                  <option value="">— Select debt —</option>
+                  {debts.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {type === 'savings' && activeAssets.length > 0 && (
+              <div className="form-group">
+                <label>Link to Asset (optional)</label>
+                <select value={assetId} onChange={e => setAssetId(e.target.value)}>
+                  <option value="">— None —</option>
+                  {activeAssets.map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="form-actions">
               <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn-primary">Add Transaction</button>
+              <button type="submit" className="btn-primary" disabled={!accountId}>Add Transaction</button>
             </div>
           </form>
         )}
@@ -202,7 +255,7 @@ function CategoryDropdown({ value, onChange, categories }) {
   );
 }
 
-export default function Transactions({ transactions, addTransaction, deleteTransaction }) {
+export default function Transactions({ transactions, addTransaction, deleteTransaction, accounts, debts, assets }) {
   const now = new Date();
   const [showModal, setShowModal]           = useState(false);
   const [filterMonth, setFilterMonth]       = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
@@ -343,7 +396,14 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
       )}
 
       {showModal && (
-        <TransactionModal onSave={addTransaction} onClose={() => setShowModal(false)} transactions={transactions} />
+        <TransactionModal
+          onSave={addTransaction}
+          onClose={() => setShowModal(false)}
+          transactions={transactions}
+          accounts={accounts}
+          debts={debts}
+          assets={assets}
+        />
       )}
     </div>
   );
