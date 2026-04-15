@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Bell } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -83,7 +84,7 @@ function AppContent() {
 
       {showNudge && (
         <div className="nudge-banner">
-          <span className="nudge-icon">🔔</span>
+          <span className="nudge-icon"><Bell size={15} strokeWidth={1.6} color="#f59e0b" /></span>
           <div className="nudge-text">
             <strong>No transactions recorded today.</strong>
             <span> Anything you'd like to add?</span>
