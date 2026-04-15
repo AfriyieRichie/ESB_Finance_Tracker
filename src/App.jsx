@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
@@ -13,11 +13,32 @@ const TABS = [
   { id: 'transactions', label: 'Transactions', icon: '≡' },
 ];
 
+const TODAY = new Date().toISOString().slice(0, 10);
+const NUDGE_KEY = `nudge-dismissed-${TODAY}`;
+
 function AppContent() {
   const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showNudge, setShowNudge] = useState(false);
   const { transactions, budgets, loading, addTransaction, deleteTransaction, upsertBudget, deleteBudget } =
     useFinanceData(currentUser?.uid);
+
+  useEffect(() => {
+    if (loading) return;
+    if (sessionStorage.getItem(NUDGE_KEY)) return;
+    const hasToday = transactions.some(t => t.date === TODAY);
+    setShowNudge(!hasToday);
+  }, [loading, transactions]);
+
+  const dismissNudge = () => {
+    sessionStorage.setItem(NUDGE_KEY, '1');
+    setShowNudge(false);
+  };
+
+  const recordNow = () => {
+    dismissNudge();
+    setActiveTab('transactions');
+  };
 
   if (!currentUser) return <Auth />;
 
@@ -59,6 +80,18 @@ function AppContent() {
           </button>
         </div>
       </header>
+
+      {showNudge && (
+        <div className="nudge-banner">
+          <span className="nudge-icon">🔔</span>
+          <div className="nudge-text">
+            <strong>No transactions recorded today.</strong>
+            <span> Anything you'd like to add?</span>
+          </div>
+          <button className="nudge-cta" onClick={recordNow}>Record Now</button>
+          <button className="nudge-dismiss" onClick={dismissNudge} title="Dismiss">✕</button>
+        </div>
+      )}
 
       <main className="app-main">
         {loading ? (

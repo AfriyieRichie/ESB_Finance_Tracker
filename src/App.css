@@ -164,6 +164,45 @@
 }
 .logout-btn:hover { color: var(--danger); border-color: var(--danger); background: rgba(240,69,69,0.08); }
 
+/* ─── Daily Nudge Banner ──────────────────────────────── */
+.nudge-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: rgba(245,158,11,0.07);
+  border-bottom: 1px solid rgba(245,158,11,0.18);
+}
+.nudge-icon { font-size: 16px; flex-shrink: 0; }
+.nudge-text { flex: 1; font-size: 13.5px; color: var(--text-2); }
+.nudge-text strong { color: var(--warning); font-weight: 600; }
+.nudge-cta {
+  padding: 6px 16px;
+  background: rgba(245,158,11,0.12);
+  color: var(--warning);
+  border: 1px solid rgba(245,158,11,0.3);
+  border-radius: 50px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nudge-cta:hover { background: rgba(245,158,11,0.22); border-color: rgba(245,158,11,0.5); }
+.nudge-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.nudge-dismiss:hover { color: var(--text-1); }
+
 /* ─── Data Loading Spinner ────────────────────────────── */
 .data-loading {
   display: flex;
