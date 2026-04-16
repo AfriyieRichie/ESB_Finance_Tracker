@@ -16,6 +16,17 @@ const TOOLTIP_STYLE = {
   fontSize: '13px',
 };
 
+// Green-shade palette for donut charts (dark → light)
+const DONUT_PALETTE = [
+  '#1a5c2e',
+  '#237a3b',
+  '#2fa04f',
+  '#52b96a',
+  '#82cf95',
+  '#aadeb7',
+  '#ccefd4',
+];
+
 const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -78,8 +89,8 @@ export default function Dashboard({ transactions, budgets, accounts }) {
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'expense')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.amount; });
     return Object.entries(acc)
-      .map(([name, value]) => ({ name, value, color: getCategoryInfo(name).color }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
   }, [transactions, currentMonth]);
 
   // ── Savings breakdown (donut) ──────────────────────────────────────────
@@ -89,8 +100,8 @@ export default function Dashboard({ transactions, budgets, accounts }) {
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'savings')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.amount; });
     return Object.entries(acc)
-      .map(([name, value]) => ({ name, value, color: getCategoryInfo(name).color }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
   }, [transactions, currentMonth]);
 
   // ── Monthly trend (area chart) – last 6 months ─────────────────────────
