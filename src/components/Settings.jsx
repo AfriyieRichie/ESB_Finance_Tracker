@@ -4,6 +4,7 @@ import {
   Eye, EyeOff, Download, Upload, Lock, Plus, X, Check,
   ChevronRight, Sliders,
 } from 'lucide-react';
+import CategoryIcon from './CategoryIcon';
 import { updateProfile, updateEmail, deleteUser } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
@@ -28,7 +29,6 @@ function downloadFile(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
-const CATEGORY_ICONS = ['📦','🏠','🍔','🚗','🎬','💊','🛍️','⚡','📚','✨','💳','💼','📈','🏦','🏢','💻','🏡','🛡️','📊','👴','₿','💹','💰','🎯','🎁','🌍','🚀','🏋️'];
 const COLOR_SWATCHES = ['#e41e20','#b31012','#0072bc','#4f46e5','#0ea5e9','#7c3aed','#eab308','#dc2626','#f97316','#22c55e','#14b8a6','#6b7280','#00e676','#06b6d4','#ec4899','#f59e0b'];
 
 // ─── Shared UI primitives ──────────────────────────────────────────────────
@@ -219,7 +219,6 @@ function ManageCategoriesSection() {
   const { prefs, updatePrefs } = usePreferences();
   const [addingFor, setAddingFor] = useState(null); // 'expense' | 'income' | 'savings'
   const [newName,   setNewName]   = useState('');
-  const [newIcon,   setNewIcon]   = useState('📦');
   const [newColor,  setNewColor]  = useState('#6b7280');
 
   const hidden  = new Set(prefs.hiddenCategories || []);
@@ -234,9 +233,9 @@ function ManageCategoriesSection() {
 
   const addCustom = () => {
     if (!newName.trim()) return;
-    const cat = { type: addingFor, name: newName.trim(), icon: newIcon, color: newColor };
+    const cat = { type: addingFor, name: newName.trim(), color: newColor };
     updatePrefs({ customCategories: [...customs, cat] });
-    setNewName(''); setNewIcon('📦'); setNewColor('#6b7280'); setAddingFor(null);
+    setNewName(''); setNewColor('#6b7280'); setAddingFor(null);
   };
 
   const removeCustom = (name, type) => {
@@ -260,7 +259,7 @@ function ManageCategoriesSection() {
             const isHidden = hidden.has(key);
             return (
               <div key={c.name} className={`cat-chip ${isHidden ? 'hidden-chip' : ''}`}>
-                <span className="cat-chip-icon">{c.icon}</span>
+                <span className="cat-chip-icon"><CategoryIcon name={c.name} size={13} /></span>
                 <span className="cat-chip-name">{c.name}</span>
                 <button type="button" className="cat-chip-toggle" onClick={() => toggleHide(key)}
                   title={isHidden ? 'Show' : 'Hide'}>
@@ -271,7 +270,7 @@ function ManageCategoriesSection() {
           })}
           {customOfType.map(c => (
             <div key={c.name} className="cat-chip custom-chip">
-              <span className="cat-chip-icon">{c.icon}</span>
+              <span className="cat-chip-icon"><CategoryIcon name={c.name} size={13} /></span>
               <span className="cat-chip-name">{c.name}</span>
               <button type="button" className="cat-chip-toggle danger"
                 onClick={() => removeCustom(c.name, type)} title="Remove custom category">
@@ -285,13 +284,6 @@ function ManageCategoriesSection() {
           <div className="cat-add-form">
             <input type="text" placeholder="Category name" value={newName}
               onChange={e => setNewName(e.target.value)} autoFocus />
-            <div className="cat-icon-picker">
-              {CATEGORY_ICONS.map(ic => (
-                <button key={ic} type="button"
-                  className={`cat-icon-opt ${newIcon === ic ? 'selected' : ''}`}
-                  onClick={() => setNewIcon(ic)}>{ic}</button>
-              ))}
-            </div>
             <div className="cat-color-picker">
               {COLOR_SWATCHES.map(col => (
                 <button key={col} type="button"
