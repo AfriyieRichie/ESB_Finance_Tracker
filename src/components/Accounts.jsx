@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react';
 import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
-import { fmt } from '../utils';
+import { useFmt } from '../contexts/PreferencesContext';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -228,6 +228,7 @@ function DebtModal({ existing, onSave, onClose }) {
 // ─── Add Asset Modal ───────────────────────────────────────────────────────
 
 function AssetModal({ existing, accounts, onSave, onClose }) {
+  const fmt = useFmt();
   const [name,       setName]       = useState(existing?.name         || '');
   const [assetType,  setAssetType]  = useState(existing?.assetType    || 'tbill');
   const [costBasis,  setCostBasis]  = useState(existing?.costBasis    || '');
@@ -316,6 +317,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
 // ─── Update Asset Value Modal ──────────────────────────────────────────────
 
 function UpdateValueModal({ asset, onSave, onClose }) {
+  const fmt = useFmt();
   const [value, setValue] = useState(asset.currentValue ?? '');
   const [busy,  setBusy]  = useState(false);
 
@@ -362,6 +364,7 @@ function UpdateValueModal({ asset, onSave, onClose }) {
 // ─── Cash Out Modal ────────────────────────────────────────────────────────
 
 function CashOutModal({ asset, accounts, onCashOut, onClose }) {
+  const fmt = useFmt();
   const [amount,   setAmount]   = useState(asset.currentValue ?? '');
   const [toAcct,   setToAcct]   = useState(accounts[0]?.id || '');
   const [busy,     setBusy]     = useState(false);
@@ -412,6 +415,7 @@ function CashOutModal({ asset, accounts, onCashOut, onClose }) {
 // ─── Account Card ──────────────────────────────────────────────────────────
 
 function AccountCard({ account, onEdit, onDelete, onReconcile }) {
+  const fmt = useFmt();
   const Icon = ACCOUNT_TYPE_ICONS[account.type] || ACCOUNT_TYPE_ICONS.other;
   const meta = getAccountTypeMeta(account.type);
 
@@ -443,6 +447,7 @@ function AccountCard({ account, onEdit, onDelete, onReconcile }) {
 // ─── Debt Card ─────────────────────────────────────────────────────────────
 
 function DebtCard({ debt, onEdit, onDelete }) {
+  const fmt = useFmt();
   const original = debt.originalAmount || debt.currentBalance;
   const paid     = Math.max(0, original - debt.currentBalance);
   const pct      = original > 0 ? Math.min((paid / original) * 100, 100) : 0;
@@ -478,6 +483,7 @@ function DebtCard({ debt, onEdit, onDelete }) {
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
 function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
+  const fmt = useFmt();
   const Icon = ASSET_TYPE_ICONS[asset.assetType] || ASSET_TYPE_ICONS.other;
   const meta = getAssetTypeMeta(asset.assetType);
   const gain = asset.currentValue - asset.costBasis;
@@ -530,6 +536,7 @@ function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
 // ─── Transfer Modal ────────────────────────────────────────────────────────
 
 function TransferModal({ accounts, onTransfer, onClose }) {
+  const fmt = useFmt();
   const today = new Date().toISOString().slice(0, 10);
   const [fromId, setFromId] = useState('');
   const [toId,   setToId]   = useState('');
@@ -618,6 +625,7 @@ function TransferModal({ accounts, onTransfer, onClose }) {
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
 export default function Accounts({ accounts, debts, assets, addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+  const fmt = useFmt();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
 

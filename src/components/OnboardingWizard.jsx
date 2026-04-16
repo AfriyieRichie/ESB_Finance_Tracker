@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { POPULAR_ACCOUNTS, ACCOUNT_TYPES } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS } from './CategoryIcon';
-import { fmt } from '../utils';
+import { useFmt } from '../contexts/PreferencesContext';
 
 export default function OnboardingWizard({ onComplete, onSkip }) {
+  const fmt = useFmt();
   const [step, setStep]       = useState(1); // 1 = pick accounts, 2 = enter balances
   const [selected, setSelected] = useState([]); // array of { name, type, color }
   const [balances, setBalances] = useState({}); // { accountName: { balance, phone } }

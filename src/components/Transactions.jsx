@@ -13,11 +13,17 @@ function TypeBadge({ type }) {
   );
 }
 import { ALL_CATEGORIES, getCategoriesForType, getCategoryInfo, EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES } from '../hooks/useFinanceData';
-import { fmt } from '../utils';
+import { useFmt, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
 function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfer, budgets }) {
+  const fmt = useFmt();
+  const expenseCats = useEffectiveCategoriesForType('expense');
+  const incomeCats  = useEffectiveCategoriesForType('income');
+  const savingsCats = useEffectiveCategoriesForType('savings');
+  const catsByType  = { expense: expenseCats, income: incomeCats, savings: savingsCats };
+
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
@@ -25,7 +31,7 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
   const [description, setDesc]   = useState('');
   const [amount,    setAmount]    = useState('');
   const [date,      setDate]      = useState(today);
-  const [category,  setCategory]  = useState('Food & Dining');
+  const [category,  setCategory]  = useState(expenseCats[0]?.name || 'Food & Dining');
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [debtId,    setDebtId]    = useState('');
   const [assetId,   setAssetId]   = useState('');
@@ -34,7 +40,7 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
   const [miniAmt,   setMiniAmt]   = useState('');
   const [miniBusy,  setMiniBusy]  = useState(false);
 
-  const cats        = getCategoriesForType(type);
+  const cats        = catsByType[type] || expenseCats;
   const activeAssets = assets.filter(a => a.status === 'active');
   const isDebtRepay  = category === 'Debt Repayment';
 
@@ -44,7 +50,7 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
 
   const handleTypeChange = (t) => {
     setType(t);
-    setCategory(getCategoriesForType(t)[0].name);
+    setCategory((catsByType[t] || expenseCats)[0]?.name || '');
     setWarning(null);
     setDebtId('');
     setAssetId('');
@@ -295,6 +301,12 @@ function CategoryDropdown({ value, onChange, categories }) {
 }
 
 export default function Transactions({ transactions, addTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
+  const fmt = useFmt();
+  const expenseCats = useEffectiveCategoriesForType('expense');
+  const incomeCats  = useEffectiveCategoriesForType('income');
+  const savingsCats = useEffectiveCategoriesForType('savings');
+  const allEffectiveCats = [...expenseCats, ...incomeCats, ...savingsCats];
+
   const now = new Date();
   const [showModal, setShowModal]           = useState(false);
   const [filterMonth, setFilterMonth]       = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
@@ -326,7 +338,10 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || search;
 
   // Categories shown in dropdown depend on selected type
-  const dropdownCategories = filterType === 'All' ? ALL_CATEGORIES : getCategoriesForType(filterType);
+  const dropdownCategories = filterType === 'All' ? allEffectiveCats
+    : filterType === 'income' ? incomeCats
+    : filterType === 'savings' ? savingsCats
+    : expenseCats;
 
   // Reset category filter when type changes and current category doesn't belong to new type
   const handleTypeChange = (e) => {

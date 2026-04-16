@@ -44,8 +44,25 @@
   --shadow-modal: 0 24px 80px rgba(0,0,0,0.85);
 
   --transition: 0.18s ease;
+  --radius: 10px;
 
   font-size: 14px;
+}
+
+/* ─── Light theme ──────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:      #f0f5f2;
+  --bg-primary:   #e8f0eb;
+  --bg-card:      #ffffff;
+  --bg-card-alt:  #f4f8f5;
+  --bg-input:     #f4f8f5;
+  --border:       #cdddd4;
+  --border-light: #a8c9b5;
+  --text-1:       #0d1a14;
+  --text-2:       #2a5c3f;
+  --text-3:       #4a7d5e;
+  --shadow-card:  0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  --shadow-modal: 0 24px 80px rgba(0,0,0,0.18);
 }
 
 html, body, #root {

@@ -4,7 +4,7 @@ import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
   getCategoriesForType,
 } from '../hooks/useFinanceData';
-import { fmt } from '../utils';
+import { useFmt, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
@@ -21,11 +21,15 @@ function BudgetModal({ month, existing, onSave, onClose }) {
   );
   const [amount, setAmount] = useState(existing?.amount || '');
 
-  const cats = getCategoriesForType(type);
+  const expenseCats = useEffectiveCategoriesForType('expense');
+  const incomeCats  = useEffectiveCategoriesForType('income');
+  const savingsCats = useEffectiveCategoriesForType('savings');
+  const catsByType  = { expense: expenseCats, income: incomeCats, savings: savingsCats };
+  const cats = catsByType[type] || expenseCats;
 
   const handleTypeChange = (t) => {
     setType(t);
-    setCategory(getCategoriesForType(t)[0]?.name || '');
+    setCategory((catsByType[t] || expenseCats)[0]?.name || '');
   };
 
   const handleSubmit = (e) => {
@@ -77,6 +81,7 @@ function BudgetModal({ month, existing, onSave, onClose }) {
 }
 
 export default function Budget({ budgets, transactions, upsertBudget, deleteBudget }) {
+  const fmt = useFmt();
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);

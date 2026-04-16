@@ -5,7 +5,7 @@ import {
   BarChart, Bar,
 } from 'recharts';
 import { EXPENSE_CATEGORIES, SAVINGS_CATEGORIES, getCategoryInfo } from '../hooks/useFinanceData';
-import { fmt } from '../utils';
+import { useFmt, usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 
 const TOOLTIP_STYLE = {
@@ -16,31 +16,36 @@ const TOOLTIP_STYLE = {
   fontSize: '13px',
 };
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={TOOLTIP_STYLE} className="chart-tooltip">
       <p className="tooltip-label">{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color, margin: '2px 0' }}>
-          {p.name}: <strong>{fmt(p.value)}</strong>
+          {p.name}: <strong>{fmt ? fmt(p.value) : p.value}</strong>
         </p>
       ))}
     </div>
   );
 };
 
-const PieTooltip = ({ active, payload }) => {
+const PieTooltip = ({ active, payload, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={TOOLTIP_STYLE} className="chart-tooltip">
       <p style={{ color: payload[0].payload.color, marginBottom: 4 }}>{payload[0].name}</p>
-      <p><strong>{fmt(payload[0].value)}</strong></p>
+      <p><strong>{fmt ? fmt(payload[0].value) : payload[0].value}</strong></p>
     </div>
   );
 };
 
-export default function Dashboard({ transactions, budgets }) {
+export default function Dashboard({ transactions, budgets, accounts }) {
+  const fmt = useFmt();
+  const { prefs } = usePreferences();
+  const hidden = prefs.hideBalances;
+  const mask   = '••••••';
+
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -120,16 +125,16 @@ export default function Dashboard({ transactions, budgets }) {
   );
 
   const statCards = [
-    { label: 'Monthly Income',   value: fmt(stats.income),   cls: 'income',      sub: 'All sources this month' },
-    { label: 'Monthly Expenses', value: fmt(stats.expenses), cls: 'expense',     sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
-    { label: 'Saved & Invested', value: fmt(stats.saved),    cls: 'saved',       sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
+    { label: 'Monthly Income',   value: hidden ? mask : fmt(stats.income),   cls: 'income',  sub: 'All sources this month' },
+    { label: 'Monthly Expenses', value: hidden ? mask : fmt(stats.expenses), cls: 'expense', sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
+    { label: 'Saved & Invested', value: hidden ? mask : fmt(stats.saved),    cls: 'saved',   sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
     {
       label: 'Cash Balance',
-      value: fmt(stats.cash),
+      value: hidden ? mask : fmt(stats.cash),
       cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg',
-      sub: stats.openingBalance !== 0
+      sub: hidden ? '' : (stats.openingBalance !== 0
         ? `${stats.openingBalance >= 0 ? '+' : ''}${fmt(stats.openingBalance)} brought forward`
-        : stats.cash >= 0 ? 'Available cash' : 'Overspent!',
+        : stats.cash >= 0 ? 'Available cash' : 'Overspent!'),
     },
   ];
 
@@ -185,7 +190,7 @@ export default function Dashboard({ transactions, budgets }) {
               <XAxis dataKey="month" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
                 tickFormatter={v => v >= 1000 ? `${v/1000}k` : v} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
               <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
               <Area type="monotone" dataKey="Income"   stroke="#00a854" fill="url(#gIncome)"  strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#00a854', strokeWidth: 0 }} />
               <Area type="monotone" dataKey="Expenses" stroke="#f04545" fill="url(#gExpense)" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#f04545', strokeWidth: 0 }} />
@@ -207,7 +212,7 @@ export default function Dashboard({ transactions, budgets }) {
                     dataKey="value" paddingAngle={3}>
                     {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip content={<PieTooltip />} />
+                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pie-legend">
@@ -238,7 +243,7 @@ export default function Dashboard({ transactions, budgets }) {
                 <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
                   tickFormatter={v => `${v}`} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
                 <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
                 <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={40} />
                 <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={40} />
@@ -261,7 +266,7 @@ export default function Dashboard({ transactions, budgets }) {
                     dataKey="value" paddingAngle={3}>
                     {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip content={<PieTooltip />} />
+                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pie-legend">
