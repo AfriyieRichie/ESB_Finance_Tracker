@@ -51,7 +51,7 @@ const PieTooltip = ({ active, payload, fmt }) => {
   );
 };
 
-export default function Dashboard({ transactions, budgets, accounts }) {
+export default function Dashboard({ transactions, budgets, accounts, debts, assets }) {
   const fmt = useFmt();
   const { prefs } = usePreferences();
   const hidden = prefs.hideBalances;
@@ -60,26 +60,21 @@ export default function Dashboard({ transactions, budgets, accounts }) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  // ── Account-derived balances (ground truth) ────────────────────────────
+  const totalCash        = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+  const totalInvestments = (assets  || []).filter(a => a.status === 'active').reduce((s, a) => s + (a.currentValue || 0), 0);
+  const totalDebts       = (debts   || []).filter(d => d.status !== 'paid').reduce((s, d) => s + (d.currentBalance || 0), 0);
+  const netWorth         = totalCash + totalInvestments - totalDebts;
+
   // ── Current-month stats ────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const txs = transactions.filter(t => t.date.startsWith(currentMonth));
+    const txs      = transactions.filter(t => t.date.startsWith(currentMonth));
     const income   = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
     const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const saved    = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
-    const thisMonthNet = income - expenses - saved;
-
-    // Opening balance — cumulative net of all months before this one
-    const prevTxs       = transactions.filter(t => t.date.slice(0, 7) < currentMonth);
-    const prevIncome    = prevTxs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-    const prevExpenses  = prevTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const prevSaved     = prevTxs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
-    const openingBalance = prevIncome - prevExpenses - prevSaved;
-
-    const cash = openingBalance + thisMonthNet;
-
     const expensePct = income > 0 ? Math.round((expenses / income) * 100) : null;
     const savedPct   = income > 0 ? Math.round((saved   / income) * 100) : null;
-    return { income, expenses, saved, cash, openingBalance, expensePct, savedPct };
+    return { income, expenses, saved, expensePct, savedPct };
   }, [transactions, currentMonth]);
 
   // ── Expense breakdown (donut) ──────────────────────────────────────────
@@ -140,12 +135,12 @@ export default function Dashboard({ transactions, budgets, accounts }) {
     { label: 'Monthly Expenses', value: hidden ? mask : fmt(stats.expenses), cls: 'expense', sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
     { label: 'Saved & Invested', value: hidden ? mask : fmt(stats.saved),    cls: 'saved',   sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
     {
-      label: 'Cash Balance',
-      value: hidden ? mask : fmt(stats.cash),
-      cls: stats.cash >= 0 ? 'balance-pos' : 'balance-neg',
-      sub: hidden ? '' : (stats.openingBalance !== 0
-        ? `${stats.openingBalance >= 0 ? '+' : ''}${fmt(stats.openingBalance)} brought forward`
-        : stats.cash >= 0 ? 'Available cash' : 'Overspent!'),
+      label:    'Cash Balance',
+      value:    hidden ? mask : fmt(totalCash),
+      cls:      totalCash >= 0 ? 'balance-pos' : 'balance-neg',
+      sub:      totalCash >= 0 ? 'Across all accounts' : 'Negative balance!',
+      netWorth: hidden ? mask : fmt(netWorth),
+      nwCls:    netWorth >= 0 ? 'nw-pos' : 'nw-neg',
     },
   ];
 
@@ -164,6 +159,12 @@ export default function Dashboard({ transactions, budgets, accounts }) {
           <div key={card.label} className={`stat-card ${card.cls}`}>
             <span className="stat-label">{card.label}</span>
             <span className="stat-value">{card.value}</span>
+            {card.netWorth !== undefined && (
+              <div className={`stat-net-worth ${card.nwCls}`}>
+                <span className="stat-nw-label">Net Worth</span>
+                <span className="stat-nw-value">{card.netWorth}</span>
+              </div>
+            )}
             <div className="stat-footer">
               <span className="stat-sub">{card.sub}</span>
               {card.pct !== null && card.pct !== undefined && (

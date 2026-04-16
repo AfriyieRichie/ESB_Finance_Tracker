@@ -206,7 +206,8 @@ function AppContent() {
         ) : (
           <>
             {activeTab === 'dashboard' && (
-              <Dashboard transactions={transactions} budgets={budgets} accounts={accounts} />
+              <Dashboard transactions={transactions} budgets={budgets}
+                accounts={accounts} debts={debts} assets={assets} />
             )}
             {activeTab === 'budget' && (
               <Budget budgets={budgets} transactions={transactions}

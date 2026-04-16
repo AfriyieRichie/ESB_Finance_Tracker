@@ -700,6 +700,31 @@
   font-weight: 500;
   letter-spacing: 0.1px;
 }
+.stat-net-worth {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 2px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.stat-nw-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.stat-nw-value {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.nw-pos .stat-nw-value { color: var(--accent); }
+.nw-neg .stat-nw-value { color: var(--danger); }
+
 .stat-pct-badge {
   font-size: 11px;
   font-weight: 700;
