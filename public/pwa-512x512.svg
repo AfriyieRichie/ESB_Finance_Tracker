@@ -1,0 +1,8 @@
+<svg width='512' height='512' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'>
+  <rect x='0' y='0' width='80' height='80' rx='14' fill='#3B6D11'/>
+  <rect x='13' y='55' width='10' height='18' rx='2' fill='white' opacity='0.6'/>
+  <rect x='27' y='46' width='10' height='27' rx='2' fill='white' opacity='0.75'/>
+  <rect x='41' y='34' width='10' height='39' rx='2' fill='white' opacity='0.88'/>
+  <rect x='55' y='21' width='10' height='52' rx='2' fill='white'/>
+  <polyline points='18,55 32,46 46,34 60,21' fill='none' stroke='white' stroke-width='2' stroke-opacity='0.45' stroke-linecap='round' stroke-linejoin='round'/>
+</svg>

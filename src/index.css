@@ -68,6 +68,11 @@
 html, body, #root {
   height: 100%;
   min-height: 100vh;
+  /* respect iPhone notch / home bar */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 body {
