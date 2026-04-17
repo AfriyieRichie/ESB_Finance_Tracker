@@ -1433,7 +1433,8 @@
     justify-content: space-around;
     backdrop-filter: blur(16px);
   }
-  .nav-tab {
+  /* Scope bottom-nav tab styles only to nav inside .header-nav */
+  .header-nav .nav-tab {
     flex-direction: column;
     align-items: center;
     gap: 3px;
@@ -1443,18 +1444,24 @@
     max-width: 80px;
     font-size: 10px;
   }
-  .nav-tab.active {
+  .header-nav .nav-tab.active {
     background: rgba(0,230,118,0.12);
     color: var(--accent);
     box-shadow: none;
   }
-  .tab-icon  { font-size: 17px; }
-  .tab-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.1px; }
+  .header-nav .tab-icon  { font-size: 17px; }
+  .header-nav .tab-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.1px; }
 
-  /* ── Header: just brand + user ── */
-  .brand-name { font-size: 15px; }
-  .user-info  { display: none; }
-  .auth-card  { padding: 28px 20px; }
+  /* ── Header: brand + user ── */
+  .brand-name    { font-size: 15px; }
+  .user-info     { display: none; }
+  .desktop-only  { display: none !important; }
+  .mobile-only   { display: flex !important; }
+  .auth-card     { padding: 28px 20px; }
+
+  /* ── Net worth hero ── */
+  .nw-value { font-size: 26px; }
+  .nw-breakdown { gap: 14px; flex-wrap: wrap; }
 
   /* ── Dashboard ── */
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1491,7 +1498,9 @@
   .app-main   { padding: 12px 12px calc(76px + env(safe-area-inset-bottom)); }
 
   /* Brand: icon only on very small screens */
-  .brand-name { display: none; }
+  .brand-name  { display: none; }
+  .brand-logo  { width: 28px; height: 28px; }
+  .nw-value    { font-size: 22px; letter-spacing: -0.8px; }
 
   /* Stat cards */
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1905,7 +1914,67 @@
 }
 .pin-lock-error { font-size: 13px; color: var(--danger); margin-top: 4px; }
 
-/* Settings icon nav button */
+/* ─── Header icon button (settings / 3-dot) ──────────── */
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px;
+  cursor: pointer;
+  color: var(--text-2);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.header-icon-btn:hover { background: var(--bg-card-alt); border-color: var(--border-light); }
+
+/* ─── Desktop / mobile visibility helpers ─────────────── */
+.desktop-only { display: flex; }
+.mobile-only  { display: none; }
+
+/* ─── Mobile 3-dot dropdown ──────────────────────────── */
+.mobile-menu-wrap { position: relative; }
+.mobile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 300;
+  overflow: hidden;
+  padding: 4px;
+}
+.mobile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+  transition: var(--transition);
+  text-align: left;
+}
+.mobile-dropdown-item:hover { background: var(--bg-card-alt); }
+.mobile-dropdown-item.danger { color: var(--danger); }
+.mobile-dropdown-item.danger:hover { background: rgba(240,69,69,0.08); }
+.mobile-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Settings icon nav button (legacy) */
 .icon-only-tab {
   background: none;
   border: none;

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Bell, Settings as SettingsIcon, Lock } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, Settings as SettingsIcon, Lock, MoreVertical, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PreferencesProvider, usePreferences } from './contexts/PreferencesContext';
 import Auth from './components/Auth';
@@ -77,6 +77,23 @@ function AppContent() {
   const { prefs, locked, setLocked } = usePreferences();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNudge, setShowNudge] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const mobileMenuRef = useRef(null);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const handler = (e) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target))
+        setShowMobileMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [showMobileMenu]);
 
   const {
     transactions, budgets, accounts, debts, assets, loading,
@@ -170,13 +187,34 @@ function AppContent() {
             <span className="user-name">{currentUser.displayName || 'User'}</span>
             <span className="user-email">{currentUser.email}</span>
           </div>
-          <button className="nav-tab icon-only-tab"
+
+          {/* Desktop: individual buttons */}
+          <button className="header-icon-btn desktop-only"
             title="Settings"
-            onClick={() => setActiveTab('settings')}
-            style={{ color: activeTab === 'settings' ? 'var(--indigo)' : undefined }}>
+            onClick={() => setActiveTab('settings')}>
             <SettingsIcon size={16} strokeWidth={1.6} color={activeTab === 'settings' ? '#00e676' : '#c8ddd5'} />
           </button>
-          <button className="logout-btn" onClick={logout} title="Sign out">⏻</button>
+          <button className="logout-btn desktop-only" onClick={logout} title="Sign out">⏻</button>
+
+          {/* Mobile: 3-dot dropdown */}
+          <div className="mobile-menu-wrap mobile-only" ref={mobileMenuRef}>
+            <button className="header-icon-btn" onClick={() => setShowMobileMenu(v => !v)} title="Menu">
+              <MoreVertical size={20} strokeWidth={1.6} color="#c8ddd5" />
+            </button>
+            {showMobileMenu && (
+              <div className="mobile-dropdown">
+                <button className="mobile-dropdown-item" onClick={() => { setActiveTab('settings'); setShowMobileMenu(false); }}>
+                  <SettingsIcon size={15} strokeWidth={1.6} color="#c8ddd5" />
+                  <span>Settings</span>
+                </button>
+                <div className="mobile-dropdown-divider" />
+                <button className="mobile-dropdown-item danger" onClick={() => { logout(); setShowMobileMenu(false); }}>
+                  <LogOut size={15} strokeWidth={1.6} color="#f04545" />
+                  <span>Sign out</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
