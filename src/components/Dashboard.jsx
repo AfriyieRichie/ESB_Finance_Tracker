@@ -4,7 +4,6 @@ import {
   PieChart, Pie, Cell,
   BarChart, Bar,
 } from 'recharts';
-import { EXPENSE_CATEGORIES, SAVINGS_CATEGORIES, getCategoryInfo } from '../hooks/useFinanceData';
 import { useFmt, usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 
@@ -117,10 +116,13 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
   // ── Budget vs actual ──────────────────────────────────────────────────
   const budgetComparison = useMemo(() => {
     return budgets.filter(b => b.month === currentMonth).map(b => {
+      const txType = b.type || 'expense';
       const spent = transactions
-        .filter(t => t.date.startsWith(currentMonth) && t.type === 'expense' && t.category === b.category)
+        .filter(t => t.date.startsWith(currentMonth) && t.type === txType && t.category === b.category)
         .reduce((s, t) => s + t.amount, 0);
-      return { name: b.category.split(' & ')[0].split(' ')[0], budget: b.amount, spent };
+      // Short label: first word only, max 8 chars
+      const label = b.category.split(' & ')[0].split(' ')[0].slice(0, 8);
+      return { name: label, budget: b.amount, spent };
     });
   }, [transactions, budgets, currentMonth]);
 
@@ -249,18 +251,21 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
             <span className="chart-badge">This month</span>
           </div>
           {budgetComparison.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={budgetComparison} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
-                  tickFormatter={v => `${v}`} />
-                <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
-                <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
-                <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={40} />
-                <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="budget-chart-scroll">
+              <ResponsiveContainer width={Math.max(budgetComparison.length * 80, 300)} height={240}>
+                <BarChart data={budgetComparison} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
+                    angle={-35} textAnchor="end" interval={0} height={50} />
+                  <YAxis tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
+                    tickFormatter={v => v >= 1000 ? `${v/1000}k` : `${v}`} width={36} />
+                  <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
+                  <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '12px', paddingTop: '4px' }} />
+                  <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={36} />
+                  <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           ) : <div className="empty-state-sm">No budgets set for this month</div>}
         </div>
 
@@ -303,7 +308,6 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
         </div>
         <div className="recent-list recent-list--horizontal">
           {recentTransactions.map(t => {
-            const cat = getCategoryInfo(t.category);
             return (
               <div key={t.id} className="recent-item">
                 <span className="recent-icon">

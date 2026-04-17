@@ -1414,32 +1414,65 @@
   .chart-card.span-2 { grid-column: span 2; }
 }
 
+/* ── Tablet / large phone ──────────────────────────────── */
 @media (max-width: 768px) {
-  .app-header { padding: 0 16px; height: 60px; }
-  .app-main   { padding: 20px 16px 40px; }
+  .app-header { padding: 0 16px; height: 56px; }
+  .app-main   { padding: 16px 14px calc(80px + env(safe-area-inset-bottom)); }
 
-  /* Nav */
-  .header-nav { gap: 2px; padding: 4px; }
-  .nav-tab    { padding: 7px 14px; }
-  .tab-label  { display: none; }
+  /* ── Bottom navigation bar ── */
+  .header-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 200;
+    background: var(--bg-primary);
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    gap: 0;
+    justify-content: space-around;
+    backdrop-filter: blur(16px);
+  }
+  .nav-tab {
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 14px;
+    border-radius: 12px;
+    flex: 1;
+    max-width: 80px;
+    font-size: 10px;
+  }
+  .nav-tab.active {
+    background: rgba(0,230,118,0.12);
+    color: var(--accent);
+    box-shadow: none;
+  }
+  .tab-icon  { font-size: 17px; }
+  .tab-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.1px; }
 
-  /* User area */
+  /* ── Header: just brand + user ── */
+  .brand-name { font-size: 15px; }
   .user-info  { display: none; }
   .auth-card  { padding: 28px 20px; }
 
-  /* Dashboard */
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  /* ── Dashboard ── */
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .chart-row  { grid-template-columns: 1fr; }
   .chart-card.span-2 { grid-column: span 1; }
   .recent-list--horizontal { grid-template-columns: 1fr; }
 
-  /* Budget */
+  /* ── Budget chart: horizontally scrollable ── */
+  .budget-chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .budget-chart-scroll > * { min-width: 480px; }
+
+  /* ── Budget ── */
   .budget-summary { flex-wrap: wrap; gap: 16px; }
   .budget-summary-item { flex: 1 1 calc(50% - 8px); }
   .budget-summary-progress { flex: 1 1 100%; }
   .budget-grid { grid-template-columns: 1fr; }
 
-  /* Transactions */
+  /* ── Transactions ── */
   .filters-bar { flex-direction: column; align-items: stretch; }
   .search-wrap { min-width: 0; }
   .cat-dropdown { width: 100%; }
@@ -1447,48 +1480,45 @@
   .tx-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .tx-table { min-width: 560px; }
 
-  /* Modal */
+  /* ── Modal ── */
   .type-toggle { flex-direction: column; }
   .form-row { grid-template-columns: 1fr; }
 }
 
+/* ── Small phone ───────────────────────────────────────── */
 @media (max-width: 480px) {
-  .app-header { padding: 0 12px; }
-  .app-main   { padding: 14px 12px 36px; }
+  .app-header { padding: 0 12px; height: 52px; }
+  .app-main   { padding: 12px 12px calc(76px + env(safe-area-inset-bottom)); }
 
-  /* Brand */
-  .brand-name { font-size: 16px; }
-  .brand-icon { font-size: 20px; }
+  /* Brand: icon only on very small screens */
+  .brand-name { display: none; }
 
-  /* Nav — icon-only, tighter */
-  .nav-tab  { padding: 7px 12px; }
-  .tab-icon { font-size: 15px; }
-
-  /* Stat cards — single column on very small screens */
+  /* Stat cards */
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat-card  { padding: 18px 14px 14px; min-height: 95px; }
-  .stat-value { font-size: 20px; letter-spacing: -0.5px; }
-  .stat-label { font-size: 9.5px; letter-spacing: 0.9px; }
-  .stat-sub   { font-size: 11px; }
+  .stat-card  { padding: 14px 12px 12px; }
+  .stat-value { font-size: 17px; letter-spacing: -0.6px; }
+  .stat-label { font-size: 9px; letter-spacing: 0.8px; }
+  .stat-sub   { font-size: 10.5px; }
+  .stat-nw-label { font-size: 9px; }
+  .stat-nw-value { font-size: 12px; }
 
   /* Charts */
-  .chart-card  { padding: 16px; }
+  .chart-card  { padding: 14px; }
   .chart-header h3 { font-size: 13px; }
   .chart-badge { display: none; }
 
   /* Page headers */
-  .page-header h2 { font-size: 20px; }
-  .month-badge { font-size: 11.5px; padding: 5px 12px; }
+  .page-header h2 { font-size: 19px; }
+  .month-badge { font-size: 11px; padding: 4px 10px; }
 
   /* Budget */
-  .budget-card { padding: 16px; }
+  .budget-card { padding: 14px; }
   .bc-amounts { flex-direction: row; }
-  .bc-amt-val { font-size: 15px; }
-  .bs-value   { font-size: 17px; }
-  .month-nav h2 { font-size: 18px; }
-  .bc-icon-ring { width: 44px; height: 44px; }
-  .bc-icon-inner { width: 34px; height: 34px; }
-  /* Always show action buttons on touch devices */
+  .bc-amt-val { font-size: 14px; }
+  .bs-value   { font-size: 16px; }
+  .month-nav h2 { font-size: 17px; }
+  .bc-icon-ring { width: 42px; height: 42px; }
+  .bc-icon-inner { width: 32px; height: 32px; }
   .bc-actions { opacity: 1; }
 
   /* Transactions */
@@ -1497,7 +1527,7 @@
   .tx-amount   { font-size: 12.5px; }
 
   /* Modal */
-  .modal { padding: 20px; border-radius: var(--radius-lg); margin: 8px; }
+  .modal { padding: 18px; border-radius: var(--radius-lg); margin: 8px; }
   .modal-header h3 { font-size: 15px; }
 
   /* Buttons */
