@@ -628,7 +628,8 @@
 }
 .icon-btn:hover { background: var(--bg-card-alt); }
 .delete-btn:hover { color: var(--danger); background: rgba(239,68,68,0.12); }
-.edit-btn:hover   { color: var(--indigo-l); background: rgba(0,230,118,0.1); }
+.edit-btn:hover   { color: var(--accent); background: rgba(0,230,118,0.1); }
+.tx-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; }
 
 /* ─── Dashboard ───────────────────────────────────────── */
 .dashboard { display: flex; flex-direction: column; gap: 24px; }

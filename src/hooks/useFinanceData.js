@@ -352,9 +352,56 @@ export function useFinanceData(userId) {
     return result;
   }, [transactions]);
 
+  // ── Update transaction (edit) ────────────────────────────────────────────
+
+  const updateTransaction = useCallback(async (original, updates) => {
+    const batch = writeBatch(db);
+
+    batch.update(doc(db, 'users', userId, 'transactions', original.id), updates);
+
+    if (original.type !== 'transfer') {
+      const oldAccId = original.accountId;
+      const newAccId = updates.accountId || original.accountId;
+      const oldAmt   = original.amount;
+      const newAmt   = updates.amount !== undefined ? updates.amount : original.amount;
+      const oldType  = original.type;
+      const newType  = updates.type || original.type;
+
+      const effect = (type, amt) => type === 'income' ? amt : -amt;
+
+      if (oldAccId === newAccId) {
+        const delta = effect(newType, newAmt) - effect(oldType, oldAmt);
+        if (delta !== 0)
+          batch.update(doc(db, 'users', userId, 'accounts', oldAccId), { balance: increment(delta) });
+      } else {
+        batch.update(doc(db, 'users', userId, 'accounts', oldAccId), { balance: increment(-effect(oldType, oldAmt)) });
+        batch.update(doc(db, 'users', userId, 'accounts', newAccId), { balance: increment(effect(newType, newAmt)) });
+      }
+
+      // Debt adjustment
+      if (original.debtId && original.debtId !== updates.debtId)
+        batch.update(doc(db, 'users', userId, 'debts', original.debtId), { currentBalance: increment(oldAmt) });
+      if (updates.debtId && updates.debtId !== original.debtId)
+        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(-newAmt) });
+      else if (updates.debtId && updates.debtId === original.debtId && newAmt !== oldAmt)
+        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(oldAmt - newAmt) });
+
+      // Asset adjustment (savings linked to asset)
+      if (original.assetId && original.assetId !== updates.assetId)
+        batch.update(doc(db, 'users', userId, 'assets', original.assetId), { currentValue: increment(-oldAmt), costBasis: increment(-oldAmt) });
+      if (updates.assetId && updates.assetId !== original.assetId)
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAmt), costBasis: increment(newAmt) });
+      else if (updates.assetId && updates.assetId === original.assetId && newAmt !== oldAmt)
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAmt - oldAmt), costBasis: increment(newAmt - oldAmt) });
+    }
+
+    await batch.commit();
+  }, [userId]);
+
   return {
     transactions, budgets, accounts, debts, assets, loading,
-    addTransaction, deleteTransaction,
+    addTransaction, updateTransaction, deleteTransaction,
+    addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,

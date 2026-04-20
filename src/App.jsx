@@ -97,7 +97,7 @@ function AppContent() {
 
   const {
     transactions, budgets, accounts, debts, assets, loading,
-    addTransaction, deleteTransaction, addTransfer,
+    addTransaction, updateTransaction, deleteTransaction, addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
@@ -254,8 +254,9 @@ function AppContent() {
             {activeTab === 'transactions' && (
               <Transactions
                 transactions={transactions} addTransaction={addTransaction}
-                deleteTransaction={deleteTransaction} accounts={accounts}
-                debts={debts} assets={assets} addTransfer={addTransfer} budgets={budgets}
+                updateTransaction={updateTransaction} deleteTransaction={deleteTransaction}
+                accounts={accounts} debts={debts} assets={assets}
+                addTransfer={addTransfer} budgets={budgets}
               />
             )}
             {activeTab === 'accounts' && (

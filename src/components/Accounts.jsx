@@ -556,14 +556,19 @@ function TransferModal({ accounts, onTransfer, onClose }) {
       return;
     }
     setBusy(true);
-    await onTransfer({
-      fromAccountId: fromId,
-      toAccountId:   toId,
-      amount:        parseFloat(amount),
-      description:   desc.trim() || 'Transfer',
-      date,
-    });
-    onClose();
+    try {
+      await onTransfer({
+        fromAccountId: fromId,
+        toAccountId:   toId,
+        amount:        parseFloat(amount),
+        description:   desc.trim() || 'Transfer',
+        date,
+      });
+      onClose();
+    } catch (err) {
+      setError(`Transfer failed: ${err.message || 'Unknown error'}`);
+      setBusy(false);
+    }
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight } from 'lucide-react';
+import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight, Pencil } from 'lucide-react';
 
 const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight };
 const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer' };
@@ -12,12 +12,12 @@ function TypeBadge({ type }) {
     </span>
   );
 }
-import { ALL_CATEGORIES, getCategoriesForType, getCategoryInfo, EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES } from '../hooks/useFinanceData';
+import { getCategoriesForType } from '../hooks/useFinanceData';
 import { useFmt, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
-function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfer, budgets }) {
+function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, addTransfer, budgets, existing }) {
   const fmt = useFmt();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
@@ -27,18 +27,20 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
-  const [type,      setType]      = useState('expense');
-  const [description, setDesc]   = useState('');
-  const [amount,    setAmount]    = useState('');
-  const [date,      setDate]      = useState(today);
-  const [category,  setCategory]  = useState(expenseCats[0]?.name || 'Food & Dining');
-  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
-  const [debtId,    setDebtId]    = useState('');
-  const [assetId,   setAssetId]   = useState('');
-  const [warning,   setWarning]   = useState(null); // { account, shortfall }
-  const [miniFrom,  setMiniFrom]  = useState('');
-  const [miniAmt,   setMiniAmt]   = useState('');
-  const [miniBusy,  setMiniBusy]  = useState(false);
+  const isEdit = !!existing;
+
+  const [type,        setType]    = useState(existing?.type || 'expense');
+  const [description, setDesc]    = useState(existing?.description || '');
+  const [amount,      setAmount]  = useState(existing?.amount != null ? String(existing.amount) : '');
+  const [date,        setDate]    = useState(existing?.date || today);
+  const [category,    setCategory]= useState(existing?.category || expenseCats[0]?.name || 'Food & Dining');
+  const [accountId,   setAccountId]=useState(existing?.accountId || accounts[0]?.id || '');
+  const [debtId,      setDebtId]  = useState(existing?.debtId || '');
+  const [assetId,     setAssetId] = useState(existing?.assetId || '');
+  const [warning,     setWarning] = useState(null);
+  const [miniFrom,    setMiniFrom]= useState('');
+  const [miniAmt,     setMiniAmt] = useState('');
+  const [miniBusy,    setMiniBusy]= useState(false);
 
   const cats        = catsByType[type] || expenseCats;
   const activeAssets = assets.filter(a => a.status === 'active');
@@ -68,8 +70,8 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
     if (!description.trim() || !amount || isNaN(amount) || Number(amount) <= 0) return;
     if (!accountId) return;
 
-    // Warn if outflow exceeds selected account balance
-    if (type === 'expense' || type === 'savings') {
+    // Balance check only when adding (not editing)
+    if (!isEdit && (type === 'expense' || type === 'savings')) {
       const selectedAccount = accounts.find(a => a.id === accountId);
       if (selectedAccount && selectedAccount.balance < Number(amount)) {
         setWarning({ account: selectedAccount, shortfall: Number(amount) - selectedAccount.balance });
@@ -79,7 +81,11 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
       }
     }
 
-    onSave(buildTx());
+    if (isEdit) {
+      onUpdate(existing, buildTx());
+    } else {
+      onSave(buildTx());
+    }
     onClose();
   };
 
@@ -111,7 +117,7 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Add Transaction</h3>
+          <h3>{isEdit ? 'Edit Transaction' : 'Add Transaction'}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -247,7 +253,7 @@ function TransactionModal({ onSave, onClose, accounts, debts, assets, addTransfe
 
             <div className="form-actions">
               <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={!accountId}>Add Transaction</button>
+              <button type="submit" className="btn-primary" disabled={!accountId}>{isEdit ? 'Save Changes' : 'Add Transaction'}</button>
             </div>
           </form>
         )}
@@ -300,7 +306,7 @@ function CategoryDropdown({ value, onChange, categories }) {
   );
 }
 
-export default function Transactions({ transactions, addTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
+export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
   const fmt = useFmt();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
@@ -309,6 +315,7 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
 
   const now = new Date();
   const [showModal, setShowModal]           = useState(false);
+  const [editingTx,  setEditingTx]          = useState(null);
   const [filterMonth, setFilterMonth]       = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterType, setFilterType]         = useState('All');
@@ -332,7 +339,6 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
 
-  const typeLabelMap = { income: '↑ Income', expense: '↓ Expense', savings: '◆ Savings', transfer: '⇄ Transfer' };
   const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
 
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || search;
@@ -448,7 +454,12 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
                     <td className={`tx-amount ${t.type}`}>
                       {typeSignMap[t.type] || ''}{fmt(t.amount)}
                     </td>
-                    <td>
+                    <td className="tx-actions">
+                      {!isTransfer && (
+                        <button className="icon-btn edit-btn" onClick={() => setEditingTx(t)} title="Edit">
+                          <Pencil size={13} strokeWidth={1.6} />
+                        </button>
+                      )}
                       <button className="icon-btn delete-btn" onClick={() => deleteTransaction(t.id)} title="Delete">✕</button>
                     </td>
                   </tr>
@@ -463,11 +474,17 @@ export default function Transactions({ transactions, addTransaction, deleteTrans
         <TransactionModal
           onSave={addTransaction}
           onClose={() => setShowModal(false)}
-          accounts={accounts}
-          debts={debts}
-          assets={assets}
-          addTransfer={addTransfer}
-          budgets={budgets}
+          accounts={accounts} debts={debts} assets={assets}
+          addTransfer={addTransfer} budgets={budgets}
+        />
+      )}
+      {editingTx && (
+        <TransactionModal
+          existing={editingTx}
+          onUpdate={updateTransaction}
+          onClose={() => setEditingTx(null)}
+          accounts={accounts} debts={debts} assets={assets}
+          addTransfer={addTransfer} budgets={budgets}
         />
       )}
     </div>
