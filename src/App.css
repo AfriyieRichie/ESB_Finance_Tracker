@@ -2225,15 +2225,21 @@ img.logo-on-light { display: none; }
 /* Net worth box: label, amount and explanation stacked */
 .nw-main { display: flex; flex-direction: column; gap: 6px; }
 
-/* Group tiles stand apart from the items they open: tinted tile, recessed item panel */
+/* Group tiles vs the items they open:
+   tiles are a lighter, green-tinted surface; opened items are darker, flat and indented (no frame) */
 .group-card {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--indigo) 8%, var(--bg-card)) 0%, var(--bg-card) 75%);
+  background: color-mix(in srgb, var(--indigo) 9%, var(--bg-card-alt));
+  border-color: color-mix(in srgb, var(--indigo) 22%, var(--border));
 }
-.group-panel {
+.group-panel { background: none; border: none; padding: 0 0 0 14px; }
+.group-panel .acct-card,
+.group-panel .debt-card,
+.group-panel .asset-card,
+.group-panel .budget-card {
   background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 12px;
+  border-color: var(--border);
+  box-shadow: none;
+  border-radius: 14px;
 }
 .group-panel .accounts-empty { padding: 8px 4px; }
 
@@ -2283,7 +2289,7 @@ img.logo-on-light { display: none; }
 
 /* Phones: account buttons sit under the balance so the account name keeps its width */
 @media (max-width: 600px) {
-  .group-panel { padding: 8px; }
+  .group-panel { padding: 0 0 0 10px; }
   .acct-card-right { flex-direction: column; align-items: flex-end; gap: 4px; }
   .acct-card-right .acct-actions { gap: 2px; }
 }
