@@ -16,8 +16,8 @@ function friendlyError(code) {
 }
 
 export default function Auth() {
-  const { login, signup } = useAuth();
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const { login, signup, resetPassword } = useAuth();
+  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'reset'
 
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
@@ -25,16 +25,31 @@ export default function Auth() {
   const [confirm,  setConfirm]  = useState('');
   const [error,    setError]    = useState('');
   const [busy,     setBusy]     = useState(false);
+  const [notice,   setNotice]   = useState('');
 
   const switchMode = (m) => {
     setMode(m);
-    setError('');
-    setName(''); setEmail(''); setPassword(''); setConfirm('');
+    setError(''); setNotice('');
+    setName(''); setPassword(''); setConfirm('');
+    if (m === 'signup') setEmail('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError(''); setNotice('');
+
+    if (mode === 'reset') {
+      setBusy(true);
+      try {
+        await resetPassword(email.trim());
+        setNotice(`If an account exists for ${email.trim()}, a password reset link has been sent. Check your inbox and spam folder.`);
+      } catch (err) {
+        setError(friendlyError(err.code));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     if (mode === 'signup') {
       if (!name.trim())               return setError('Please enter your full name.');
@@ -67,16 +82,18 @@ export default function Auth() {
         </div>
 
         <h2 className="auth-title">
-          {mode === 'login' ? 'Welcome back' : 'Create your account'}
+          {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create your account' : 'Reset your password'}
         </h2>
         <p className="auth-subtitle">
           {mode === 'login'
             ? 'Sign in to access your personal finance dashboard.'
-            : 'Start tracking your income, expenses and savings.'}
+            : mode === 'signup'
+              ? 'Start tracking your income, expenses and savings.'
+              : "Enter your account email and we'll send you a link to set a new password."}
         </p>
 
         {/* Mode toggle */}
-        <div className="auth-toggle">
+        {mode !== 'reset' && <div className="auth-toggle">
           <button
             className={`auth-toggle-btn ${mode === 'login' ? 'active' : ''}`}
             onClick={() => switchMode('login')}
@@ -87,7 +104,7 @@ export default function Auth() {
             onClick={() => switchMode('signup')}
             type="button"
           >Create Account</button>
-        </div>
+        </div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           {mode === 'signup' && (
@@ -116,7 +133,7 @@ export default function Auth() {
             />
           </div>
 
-          <div className="form-group">
+          {mode !== 'reset' && <div className="form-group">
             <label>Password</label>
             <input
               type="password"
@@ -125,7 +142,14 @@ export default function Auth() {
               onChange={e => setPassword(e.target.value)}
               required
             />
-          </div>
+            {mode === 'login' && (
+              <button
+                type="button"
+                className="auth-switch-link auth-forgot-link"
+                onClick={() => switchMode('reset')}
+              >Forgot password?</button>
+            )}
+          </div>}
 
           {mode === 'signup' && (
             <div className="form-group">
@@ -140,16 +164,24 @@ export default function Auth() {
             </div>
           )}
 
-          {error && <p className="auth-error">{error}</p>}
+          {error  && <p className="auth-error">{error}</p>}
+          {notice && <p className="auth-notice">{notice}</p>}
 
           <button type="submit" className="auth-submit" disabled={busy}>
             {busy
               ? 'Please wait…'
-              : mode === 'login' ? 'Sign In' : 'Create Account'}
+              : mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}
           </button>
         </form>
 
-        <p className="auth-switch">
+        {mode === 'reset' ? (
+          <p className="auth-switch">
+            Remembered it?{' '}
+            <button type="button" className="auth-switch-link" onClick={() => switchMode('login')}>
+              Back to sign in
+            </button>
+          </p>
+        ) : <p className="auth-switch">
           {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
           <button
             type="button"
@@ -158,7 +190,7 @@ export default function Auth() {
           >
             {mode === 'login' ? 'Create one' : 'Sign in'}
           </button>
-        </p>
+        </p>}
       </div>
     </div>
   );

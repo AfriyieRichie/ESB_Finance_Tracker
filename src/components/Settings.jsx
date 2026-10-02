@@ -667,7 +667,26 @@ function DataSection({ transactions, accounts }) {
 
 // ─── 7. Account actions ────────────────────────────────────────────────────
 
+const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','preferences'];
+
+// Deletes every document in the user's subcollections, in batches of ≤500 (Firestore limit)
+async function wipeUserData(uid) {
+  for (const col of USER_COLLECTIONS) {
+    const snap = await getDocs(collection(db, 'users', uid, col));
+    for (let i = 0; i < snap.docs.length; i += 500) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 500).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+}
+
 function AccountSection({ logout }) {
+  const [showReset,  setShowReset]  = useState(false);
+  const [resetInput, setResetInput] = useState('');
+  const [resetBusy,  setResetBusy]  = useState(false);
+  const [resetErr,   setResetErr]   = useState('');
+
   const [showDelete,  setShowDelete]  = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleteBusy,  setDeleteBusy]  = useState(false);
@@ -679,20 +698,31 @@ function AccountSection({ logout }) {
     }
     setDeleteBusy(true);
     try {
-      const uid = auth.currentUser.uid;
-      // Delete all subcollections
-      for (const col of ['transactions','budgets','accounts','debts','assets','preferences']) {
-        const snap  = await getDocs(collection(db, 'users', uid, col));
-        const batch = writeBatch(db);
-        snap.docs.forEach(d => batch.delete(d.ref));
-        if (snap.docs.length) await batch.commit();
-      }
+      await wipeUserData(auth.currentUser.uid);
       await deleteUser(auth.currentUser);
     } catch (err) {
       setDeleteErr(err.code === 'auth/requires-recent-login'
         ? 'Re-login required before deleting your account.'
         : 'Failed to delete account. Please try again.');
       setDeleteBusy(false);
+    }
+  };
+
+  const closeReset = () => { setShowReset(false); setResetInput(''); setResetErr(''); };
+
+  const handleReset = async () => {
+    if (resetInput !== 'RESET') {
+      setResetErr('Type RESET (all caps) to confirm.'); return;
+    }
+    setResetBusy(true);
+    try {
+      await wipeUserData(auth.currentUser.uid);
+      sessionStorage.removeItem('onboarding-skipped');
+      closeReset();
+    } catch {
+      setResetErr('Failed to reset data. Please try again.');
+    } finally {
+      setResetBusy(false);
     }
   };
 
@@ -704,6 +734,14 @@ function AccountSection({ logout }) {
         </button>
       </SettingsRow>
 
+      <SettingsRow label="Reset all data" hint="Erase all transactions, accounts, budgets, debts, assets and preferences but keep your login">
+        <button type="button" className="btn-ghost"
+          style={{ fontSize: 13, color: 'var(--danger)', borderColor: 'var(--danger)' }}
+          onClick={() => setShowReset(true)}>
+          <Trash2 size={13} strokeWidth={1.6} /> Reset
+        </button>
+      </SettingsRow>
+
       <SettingsRow label="Delete account" hint="Permanently delete all your data — this cannot be undone">
         <button type="button" className="btn-ghost"
           style={{ fontSize: 13, color: 'var(--danger)', borderColor: 'var(--danger)' }}
@@ -711,6 +749,41 @@ function AccountSection({ logout }) {
           <Trash2 size={13} strokeWidth={1.6} /> Delete
         </button>
       </SettingsRow>
+
+      {showReset && (
+        <div className="modal-overlay" onClick={closeReset}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ color: 'var(--danger)' }}>Reset All Data</h3>
+              <button className="modal-close" onClick={closeReset}>✕</button>
+            </div>
+            <div className="modal-form">
+              <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.7 }}>
+                This will permanently erase <strong>all your transactions, budgets, accounts,
+                debts, assets and preferences</strong>. Your login stays, and you'll start
+                again from the setup wizard. This cannot be undone. You may want to export
+                your data first.
+              </p>
+              <div className="form-group" style={{ marginTop: 16 }}>
+                <label>Type <strong>RESET</strong> to confirm</label>
+                <input type="text" value={resetInput}
+                  onChange={e => { setResetInput(e.target.value); setResetErr(''); }}
+                  placeholder="RESET" autoFocus />
+              </div>
+              {resetErr && <p style={{ fontSize: 13, color: 'var(--danger)' }}>{resetErr}</p>}
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={closeReset}>Cancel</button>
+                <button type="button" className="btn-primary"
+                  style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                  disabled={resetBusy || resetInput !== 'RESET'}
+                  onClick={handleReset}>
+                  {resetBusy ? 'Resetting…' : 'Reset Everything'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDelete && (
         <div className="modal-overlay" onClick={() => setShowDelete(false)}>
