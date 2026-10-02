@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { db } from '../firebase';
+import { db, whenSaved } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES, ASSET_TYPES } from '../hooks/useFinanceData';
 import { useExchangeRates } from '../hooks/useExchangeRates';
@@ -105,7 +105,7 @@ export function PreferencesProvider({ children, userId }) {
     setPrefs(p => ({ ...p, ...updates }));
     if (updates.theme) applyTheme(updates.theme);
     if (userId) {
-      await setDoc(doc(db, 'users', userId, 'preferences', 'main'), updates, { merge: true });
+      await whenSaved(setDoc(doc(db, 'users', userId, 'preferences', 'main'), updates, { merge: true }));
     }
   }, [userId]);
 
@@ -157,7 +157,7 @@ export function PreferencesProvider({ children, userId }) {
     const next = { ...(prefs.fxOverrides || {}) };
     if (value > 0) next[key] = value; else delete next[key];
     setPrefs(p => ({ ...p, fxOverrides: next }));
-    if (userId) await setDoc(doc(db, 'users', userId, 'preferences', 'main'), { fxOverrides: next }, { merge: true });
+    if (userId) await whenSaved(setDoc(doc(db, 'users', userId, 'preferences', 'main'), { fxOverrides: next }, { merge: true }));
   }, [baseCurrency, prefs.fxOverrides, userId]);
 
   // ── Format functions ───────────────────────────────────────────────────

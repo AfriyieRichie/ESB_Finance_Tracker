@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../firebase';
+import { auth, clearLocalData } from '../firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -33,8 +33,10 @@ export function AuthProvider({ children }) {
     return sendPasswordResetEmail(auth, email);
   }
 
-  function logout() {
-    return signOut(auth);
+  // Sign out and remove this user's offline copy of their data from the device
+  async function logout() {
+    await signOut(auth);
+    await clearLocalData();
   }
 
   useEffect(() => {

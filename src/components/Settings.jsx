@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 import { updateProfile, updateEmail, deleteUser } from 'firebase/auth';
-import { auth, db } from '../firebase';
+import { auth, db, clearLocalData } from '../firebase';
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { usePreferences, CURRENCIES } from '../contexts/PreferencesContext';
 import {
@@ -841,6 +841,7 @@ function AccountSection({ logout }) {
     try {
       await wipeUserData(auth.currentUser.uid);
       await deleteUser(auth.currentUser);
+      await clearLocalData();
     } catch (err) {
       setDeleteErr(err.code === 'auth/requires-recent-login'
         ? 'Re-login required before deleting your account.'

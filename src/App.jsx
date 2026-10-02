@@ -96,7 +96,7 @@ function AppContent() {
   }, [showMobileMenu]);
 
   const {
-    transactions: rawTransactions, budgets, accounts: rawAccounts, debts: rawDebts, assets: rawAssets, loading,
+    transactions: rawTransactions, budgets, accounts: rawAccounts, debts: rawDebts, assets: rawAssets, loading, accountsConfirmed,
     addTransaction, updateTransaction, deleteTransaction, addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
@@ -192,7 +192,8 @@ function AppContent() {
   }, [prefs.pinHash, prefs.autoLockTimeout, setLocked]);
 
   // ── Onboarding ─────────────────────────────────────────────────────────
-  const showOnboarding = !loading && accounts.length === 0 && !sessionStorage.getItem(ONBOARD_SKIP_KEY);
+  // Wait for the server to confirm there are no accounts: offline, an empty cache isn't proof of a new user
+  const showOnboarding = !loading && accountsConfirmed && accounts.length === 0 && !sessionStorage.getItem(ONBOARD_SKIP_KEY);
   const handleOnboardingComplete = async (newAccounts) => {
     for (const acct of newAccounts) await addAccount(acct);
   };

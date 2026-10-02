@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db } from '../firebase';
+import { db, whenSaved } from '../firebase';
 import {
   collection, doc, addDoc, deleteDoc, setDoc, onSnapshot,
   updateDoc, increment, writeBatch, deleteField,
@@ -133,6 +133,8 @@ export function useFinanceData(userId) {
   const [debts,        setDebts]        = useState([]);
   const [assets,       setAssets]       = useState([]);
   const [loading,      setLoading]      = useState(true);
+  // True once the server (not just the offline cache) has confirmed the accounts list
+  const [accountsConfirmed, setAccountsConfirmed] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -150,7 +152,12 @@ export function useFinanceData(userId) {
     );
     const unsubAccounts = onSnapshot(
       collection(db, 'users', userId, 'accounts'),
-      snap => { setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); loaded.accounts = true; checkDone(); }
+      { includeMetadataChanges: true },
+      snap => {
+        setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        if (!snap.metadata.fromCache) setAccountsConfirmed(true);
+        loaded.accounts = true; checkDone();
+      }
     );
     const unsubDebts = onSnapshot(
       collection(db, 'users', userId, 'debts'),
@@ -190,7 +197,7 @@ export function useFinanceData(userId) {
       });
     }
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId]);
 
   const deleteTransaction = useCallback(async (id) => {
@@ -223,7 +230,7 @@ export function useFinanceData(userId) {
       }
     }
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId, transactions]);
 
   // amount is in the source account's currency; toAmount (if given) is what arrived in the
@@ -248,7 +255,7 @@ export function useFinanceData(userId) {
     batch.update(doc(db, 'users', userId, 'accounts', fromAccountId), { balance: increment(-amount) });
     batch.update(doc(db, 'users', userId, 'accounts', toAccountId),   { balance: increment(received) });
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId]);
 
   // ── Budgets ─────────────────────────────────────────────────────────────
@@ -256,39 +263,39 @@ export function useFinanceData(userId) {
   const upsertBudget = useCallback(async (budget) => {
     const safe  = s => s.replace(/[^\w]/g, '_');
     const docId = `${budget.type || 'expense'}_${safe(budget.category)}_${budget.month}`;
-    await setDoc(doc(db, 'users', userId, 'budgets', docId), { type: 'expense', ...budget }, { merge: true });
+    await whenSaved(setDoc(doc(db, 'users', userId, 'budgets', docId), { type: 'expense', ...budget }, { merge: true }));
   }, [userId]);
 
   const deleteBudget = useCallback(async (id) => {
-    await deleteDoc(doc(db, 'users', userId, 'budgets', id));
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'budgets', id)));
   }, [userId]);
 
   // ── Accounts ────────────────────────────────────────────────────────────
 
   const addAccount = useCallback(async (account) => {
-    await addDoc(collection(db, 'users', userId, 'accounts'), account);
+    await whenSaved(addDoc(collection(db, 'users', userId, 'accounts'), account));
   }, [userId]);
 
   const updateAccount = useCallback(async (id, updates) => {
-    await updateDoc(doc(db, 'users', userId, 'accounts', id), updates);
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'accounts', id), updates));
   }, [userId]);
 
   const deleteAccount = useCallback(async (id) => {
-    await deleteDoc(doc(db, 'users', userId, 'accounts', id));
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'accounts', id)));
   }, [userId]);
 
   // ── Debts ───────────────────────────────────────────────────────────────
 
   const addDebt = useCallback(async (debt) => {
-    await addDoc(collection(db, 'users', userId, 'debts'), debt);
+    await whenSaved(addDoc(collection(db, 'users', userId, 'debts'), debt));
   }, [userId]);
 
   const updateDebt = useCallback(async (id, updates) => {
-    await updateDoc(doc(db, 'users', userId, 'debts', id), updates);
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'debts', id), updates));
   }, [userId]);
 
   const deleteDebt = useCallback(async (id) => {
-    await deleteDoc(doc(db, 'users', userId, 'debts', id));
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'debts', id)));
   }, [userId]);
 
   // ── Assets ──────────────────────────────────────────────────────────────
@@ -321,15 +328,15 @@ export function useFinanceData(userId) {
       });
     }
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId]);
 
   const updateAsset = useCallback(async (id, updates) => {
-    await updateDoc(doc(db, 'users', userId, 'assets', id), updates);
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'assets', id), updates));
   }, [userId]);
 
   const updateAssetValue = useCallback(async (id, newValue) => {
-    await updateDoc(doc(db, 'users', userId, 'assets', id), { currentValue: newValue });
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'assets', id), { currentValue: newValue }));
   }, [userId]);
 
   // Cash out: marks asset done, creates income tx, credits target account
@@ -361,11 +368,11 @@ export function useFinanceData(userId) {
       balance: increment(receivedAmount),
     });
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId, assets]);
 
   const deleteAsset = useCallback(async (id) => {
-    await deleteDoc(doc(db, 'users', userId, 'assets', id));
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'assets', id)));
   }, [userId]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────
@@ -430,11 +437,11 @@ export function useFinanceData(userId) {
         batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset - oldAsset), costBasis: increment(newAsset - oldAsset) });
     }
 
-    await batch.commit();
+    await whenSaved(batch.commit());
   }, [userId]);
 
   return {
-    transactions, budgets, accounts, debts, assets, loading,
+    transactions, budgets, accounts, debts, assets, loading, accountsConfirmed,
     addTransaction, updateTransaction, deleteTransaction,
     addTransfer,
     upsertBudget, deleteBudget,
