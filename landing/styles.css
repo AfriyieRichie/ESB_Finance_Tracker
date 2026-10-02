@@ -251,3 +251,13 @@ details p { color: var(--text-2); margin-top: 10px; font-size: 15.5px; }
 
 @media (max-width: 960px) { .who-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .who-grid { grid-template-columns: 1fr; } }
+
+/* ── Alternating section bands: every other section sits on a deep green tint so sections
+      don't run together on plain black ─ */
+.band {
+  background:
+    radial-gradient(900px 320px at 50% 0%, rgba(0, 230, 118, 0.05), transparent 70%),
+    linear-gradient(180deg, #0d1a14 0%, #0a120e 100%);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
