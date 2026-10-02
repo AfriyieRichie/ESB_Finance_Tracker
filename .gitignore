@@ -31,3 +31,4 @@ firebase-debug.*.log
 
 # Design source files (kept locally, not needed by the app)
 logos/
+design-reference/
