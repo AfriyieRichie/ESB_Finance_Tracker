@@ -775,6 +775,8 @@
   box-shadow: var(--shadow-card);
 }
 .chart-card.span-2 { grid-column: span 2; }
+.chart-card { min-width: 0; }   /* let grid cells shrink so charts can't push into neighbours */
+.budget-chart-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 
 .chart-header {
   display: flex;
@@ -1487,7 +1489,6 @@
 
   /* ── Budget chart: horizontally scrollable ── */
   .budget-chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .budget-chart-scroll > * { min-width: 480px; }
 
   /* ── Budget ── */
   .budget-summary { flex-wrap: wrap; gap: 16px; }

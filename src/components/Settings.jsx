@@ -550,16 +550,16 @@ function NotificationsSection() {
       <InstallRow />
       <PushRow />
       <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '8px 0 4px', lineHeight: 1.6 }}>
-        Budget and large-transaction alerts notify you as you record transactions. Daily reminders and the
-        weekly digest show in the app for now; scheduled push delivery is coming in a later update.
+        Budget and large-transaction alerts notify you as you record transactions. The daily reminder
+        (8pm, only if nothing was recorded) and weekly digest (Sundays, 6pm) arrive even when the app is closed.
       </p>
       <SettingsRow label="Budget alerts" hint="Warn when a category hits 80% of its budget">
         <Toggle checked={n.budgetAlert} onChange={v => updateNotifications({ budgetAlert: v })} />
       </SettingsRow>
-      <SettingsRow label="Daily transaction reminder" hint="Nudge if no transaction recorded today">
+      <SettingsRow label="Daily transaction reminder" hint="8pm push, plus an in-app banner, if nothing was recorded today">
         <Toggle checked={n.billReminders} onChange={v => updateNotifications({ billReminders: v })} />
       </SettingsRow>
-      <SettingsRow label="Weekly digest" hint="Summary of your week's spending">
+      <SettingsRow label="Weekly digest" hint="Sunday 6pm: spent, income, saved and top category">
         <Toggle checked={n.weeklyDigest} onChange={v => updateNotifications({ weeklyDigest: v })} />
       </SettingsRow>
       <SettingsRow label="Goal milestones" hint="Celebrate when a savings goal is reached">

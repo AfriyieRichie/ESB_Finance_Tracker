@@ -3,9 +3,10 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { app, db } from './firebase';
 import { isIOS, isStandalone } from './pwa';
 
-// Web Push certificate key from Firebase Console → Project settings → Cloud Messaging.
-// Without it, on-device notifications still work but the server can't push to this device.
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+// Public Web Push certificate key (Firebase Console → Project settings → Cloud Messaging).
+// Safe to ship in client code; lets the scheduled function push to this device.
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY ||
+  'BOowU0DWcCpXtURlqCYgEOnYLmvfrv_q0-EMJJfqSETvUtzlBRED9nSqTvIFIJParwfovbxEI347Vvw5DSBDm4E';
 
 /** 'granted' | 'denied' | 'default' | 'needs-install' (iPhone not added to home screen) | 'unsupported' */
 export function notificationStatus() {
@@ -29,6 +30,7 @@ export async function registerPush(uid) {
     await setDoc(doc(db, 'users', uid, 'pushTokens', token), {
       token,
       userAgent: navigator.userAgent,
+      timeZone:  Intl.DateTimeFormat().resolvedOptions().timeZone,   // reminders go out at local time
       updatedAt: serverTimestamp(),
     }, { merge: true });
     return true;

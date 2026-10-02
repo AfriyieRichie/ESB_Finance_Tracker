@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
-  BarChart, Bar,
+  BarChart, Bar, Rectangle,
 } from 'recharts';
 import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
@@ -26,13 +26,23 @@ const DONUT_PALETTE = [
   '#ccefd4',
 ];
 
+// Hovered bar "pops out": slightly wider and taller, brighter, with a soft outline
+const PopBar = ({ x, y, width, height, fill, highlight }) => (
+  <Rectangle x={x - 3} y={y - 4} width={width + 6} height={height + 4}
+    radius={[7, 7, 0, 0]} fill={highlight || fill}
+    stroke="rgba(234,245,239,0.35)" strokeWidth={1} />
+);
+
+// Series whose bar colour is too dark to read as text in the tooltip
+const TOOLTIP_TEXT_COLOR = { Budget: '#9cc7ad' };
+
 const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={TOOLTIP_STYLE} className="chart-tooltip">
       <p className="tooltip-label">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, margin: '2px 0' }}>
+        <p key={i} style={{ color: TOOLTIP_TEXT_COLOR[p.name] || p.color, margin: '2px 0' }}>
           {p.name}: <strong>{fmt ? fmt(p.value) : p.value}</strong>
         </p>
       ))}
@@ -280,19 +290,24 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
           </div>
           {budgetComparison.length > 0 ? (
             <div className="budget-chart-scroll">
-              <ResponsiveContainer width={Math.max(budgetComparison.length * 80, 300)} height={240}>
+              {/* Fills the card; scrolls inside it when there are too many budgets to fit */}
+              <div style={{ minWidth: budgetComparison.length * 64 }}>
+              <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={budgetComparison} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} vertical={false} />
                   <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
                     angle={-35} textAnchor="end" interval={0} height={50} />
                   <YAxis tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
                     tickFormatter={v => v >= 1000 ? `${v/1000}k` : `${v}`} width={36} />
-                  <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
+                  <Tooltip cursor={false} content={props => <CustomTooltip {...props} fmt={fmt} />} />
                   <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '12px', paddingTop: '4px' }} />
-                  <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={36} />
-                  <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={36} />
+                  <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={36}
+                    activeBar={props => <PopBar {...props} highlight="#2c5a3e" />} />
+                  <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={36}
+                    activeBar={props => <PopBar {...props} highlight="#00e676" />} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             </div>
           ) : <div className="empty-state-sm">No budgets set for this month</div>}
         </div>
