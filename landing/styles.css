@@ -143,21 +143,6 @@ h3 { font-size: 18px; font-weight: 600; }
   content: ''; position: absolute; left: 0; top: 7px; width: 16px; height: 16px; border-radius: 50%;
   background: rgba(0, 230, 118, 0.15) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%2300e676' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat;
 }
-.mock-panel {
-  background: linear-gradient(160deg, var(--deep), var(--bg));
-  border: 1px solid var(--border); border-radius: 26px; padding: 28px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-.b-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-.b-card:first-child { border-color: var(--green); }
-.b-head { display: flex; justify-content: space-between; align-items: center; }
-.b-head span { font-size: 12.5px; color: var(--muted); }
-.b-fig { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.b-fig span { display: flex; flex-direction: column; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-.b-fig b { font-size: 15px; letter-spacing: normal; text-transform: none; color: var(--text); margin-top: 2px; }
-.b-fig b.pos { color: var(--green); }
-.b-bar { height: 6px; background: var(--card-2); border-radius: 99px; overflow: hidden; }
-.b-bar i { display: block; height: 100%; width: var(--w); background: #ffffff; border-radius: 99px; }
 
 .t-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
 .t-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -216,8 +201,32 @@ details p { color: var(--text-2); margin-top: 10px; font-size: 15.5px; }
   .section { padding: 64px 0; }
   .features, .steps { grid-template-columns: 1fr; }
   .phone { width: 100%; max-width: 300px; }
-  .mock-panel { padding: 18px; }
-  .t-row { flex-direction: column; align-items: flex-start; }
+    .t-row { flex-direction: column; align-items: flex-start; }
   .t-arrow { transform: rotate(90deg); }
   .btn-lg { flex: 1; }
+}
+
+/* ── Real app screenshots in a phone frame ───────────── */
+.shot { position: relative; justify-self: center; margin: 0; }
+.shot-phone {
+  width: 300px; padding: 10px; border-radius: 44px;
+  background: linear-gradient(160deg, #1d2a22, #0c120f);
+  border: 1px solid #263a2e;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.03) inset;
+}
+.shot-phone img { width: 100%; height: auto; border-radius: 34px; }
+.shot-badge {
+  position: absolute; left: -190px; bottom: 48px; width: 340px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.shot-badge .t-row b { font-size: 19px; white-space: nowrap; }
+.shot-badge .t-row small { white-space: nowrap; }
+@media (max-width: 1200px) {
+  .shot-badge { left: -70px; }
+}
+@media (max-width: 960px) {
+  .shot-badge { position: static; width: 100%; max-width: 320px; margin: 20px auto 0; }
+}
+@media (max-width: 600px) {
+  .shot-phone { width: 100%; max-width: 280px; }
 }

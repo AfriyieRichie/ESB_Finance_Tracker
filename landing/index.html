@@ -166,23 +166,12 @@
             <li>Alerts at 80% and when you go over</li>
           </ul>
         </div>
-        <div class="mock-panel" aria-hidden="true">
-          <div class="b-card">
-            <div class="b-head"><b>Expenses</b><span>6 budgets</span></div>
-            <div class="b-fig"><span>Budgeted<b>£ 1,500</b></span><span>Spent<b>£ 1,186</b></span><span>Left<b class="pos">£ 314</b></span></div>
-            <div class="b-bar"><i style="--w:79%"></i></div>
+        <figure class="shot">
+          <div class="shot-phone">
+            <img src="/assets/screens/app-budget.webp" width="390" height="844" loading="lazy"
+              alt="MiAhorro budget screen showing income, expenses and savings totals with the expenses budgets opened" />
           </div>
-          <div class="b-card">
-            <div class="b-head"><b>Savings</b><span>3 budgets</span></div>
-            <div class="b-fig"><span>Budgeted<b>£ 600</b></span><span>Saved<b>£ 450</b></span><span>To save<b>£ 150</b></span></div>
-            <div class="b-bar"><i style="--w:75%"></i></div>
-          </div>
-          <div class="b-card">
-            <div class="b-head"><b>Income</b><span>2 budgets</span></div>
-            <div class="b-fig"><span>Budgeted<b>£ 2,400</b></span><span>Received<b>£ 2,400</b></span><span>To receive<b>£ 0</b></span></div>
-            <div class="b-bar"><i style="--w:100%"></i></div>
-          </div>
-        </div>
+        </figure>
       </div>
     </section>
 
@@ -198,12 +187,17 @@
           </p>
           <ul class="ticks">
             <li>Over 35 currencies with daily rates</li>
+            <li>See each account in its own currency, with its value in yours</li>
             <li>Record the exact amount that arrived on transfers, fees included</li>
             <li>Past reports keep the rate of the day, so they never drift</li>
           </ul>
         </div>
-        <div class="mock-panel" aria-hidden="true">
-          <div class="t-card">
+        <figure class="shot">
+          <div class="shot-phone">
+            <img src="/assets/screens/app-accounts.webp" width="390" height="844" loading="lazy"
+              alt="MiAhorro accounts screen with pound and cedi accounts and their totals converted to pounds" />
+          </div>
+          <div class="t-card shot-badge" aria-hidden="true">
             <span class="m-label">Transfer</span>
             <div class="t-row">
               <div><small>Sent from Monzo</small><b>£ 100.00</b></div>
@@ -212,7 +206,32 @@
             </div>
             <span class="t-rate">Rate you got: 1 GBP = 15.52 GHS</span>
           </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ── Spotlight: account history ──────────────────────────── -->
+    <section class="section split">
+      <div class="wrap split-inner">
+        <div class="split-copy">
+          <span class="eyebrow">Account history</span>
+          <h2>Every account's history at a glance</h2>
+          <p>
+            Tap any account to see exactly what came in and went out, for this month, the last 30 days
+            or any dates you choose.
+          </p>
+          <ul class="ticks">
+            <li>Money in, money out and net for the period</li>
+            <li>Transfers shown on both accounts, in each one's currency</li>
+            <li>Newest or oldest first</li>
+          </ul>
         </div>
+        <figure class="shot">
+          <div class="shot-phone">
+            <img src="/assets/screens/app-activity.webp" width="390" height="844" loading="lazy"
+              alt="MiAhorro account history for a Monzo account showing this month's transactions with money in, out and net totals" />
+          </div>
+        </figure>
       </div>
     </section>
 

@@ -495,8 +495,8 @@ function AccountActivityModal({ account, accounts, transactions, onClose }) {
 
   const preset = (kind) => {
     const now = new Date();
-    if (kind === 'month')  { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); setTo(''); }
-    if (kind === '30')     { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))); setTo(''); }
+    if (kind === 'month')  { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); setTo(isoDay(now)); }
+    if (kind === '30')     { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))); setTo(isoDay(now)); }
     if (kind === 'all')    { setFrom(''); setTo(''); }
   };
 

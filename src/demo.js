@@ -29,7 +29,7 @@ export function demoData() {
     ({ id, date: day(offset), description, amount, type, category, accountId, ...extra });
   const transactions = [
     tx('t1',  0, 'Groceries at Tesco', 42.1, 'expense', 'Food & Dining', 'a1'),
-    tx('t2',  0, 'Monthly salary from a company with a long name', 2400, 'income', 'Salary', 'a1'),
+    tx('t2',  0, 'Monthly salary', 2400, 'income', 'Salary', 'a1'),
     tx('t3',  1, 'Bus pass', 65, 'expense', 'Transportation', 'a1'),
     tx('t4',  1, 'Netflix', 10.99, 'expense', 'Entertainment', 'a1'),
     tx('t5',  2, 'Electricity bill', 88.3, 'expense', 'Utilities', 'a1'),
