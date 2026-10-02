@@ -14,7 +14,7 @@ const firebaseConfig = {
   appId: "1:603105872869:web:09b3a86d7c5b5d938cbd0c"
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Keep a copy of the user's data on the device (IndexedDB) so the app loads and

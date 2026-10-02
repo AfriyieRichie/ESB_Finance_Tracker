@@ -2108,3 +2108,9 @@
 @media (max-width: 900px) {
   .budget-groups { grid-template-columns: 1fr; }
 }
+
+/* ─── Install & notifications ─────────────────────────── */
+.settings-ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--success); }
+.install-steps { margin: 0 0 8px; padding: 10px 14px 10px 32px; font-size: 13px; line-height: 1.8; color: var(--text-2); background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.install-banner { background: color-mix(in srgb, var(--success) 7%, transparent); border-bottom-color: color-mix(in srgb, var(--success) 20%, transparent); }
+.install-banner .nudge-text strong { color: var(--success); }

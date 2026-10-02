@@ -10,6 +10,8 @@ import Accounts from './components/Accounts';
 import Settings from './components/Settings';
 import OnboardingWizard from './components/OnboardingWizard';
 import { useFinanceData } from './hooks/useFinanceData';
+import { useInstall } from './pwa';
+import { notify, registerPush } from './notifications';
 import './App.css';
 
 const TABS = [
@@ -22,6 +24,7 @@ const TABS = [
 const TODAY          = new Date().toISOString().slice(0, 10);
 const NUDGE_KEY      = `nudge-dismissed-${TODAY}`;
 const ONBOARD_SKIP_KEY = 'onboarding-skipped';
+const INSTALL_DISMISS_KEY = 'install-banner-dismissed';
 
 // ─── PIN Lock Screen ───────────────────────────────────────────────────────
 
@@ -74,7 +77,20 @@ function PinLock({ pinHash, onUnlock }) {
 
 function AppContent() {
   const { currentUser, logout } = useAuth();
-  const { prefs, locked, setLocked, prefsLoading, baseCurrency, toBase } = usePreferences();
+  const { prefs, locked, setLocked, prefsLoading, baseCurrency, toBase, fmt } = usePreferences();
+  const install = useInstall();
+  const [installDismissed, setInstallDismissed] = useState(() => {
+    try { return !!localStorage.getItem(INSTALL_DISMISS_KEY); } catch { return false; }
+  });
+  const dismissInstall = () => {
+    try { localStorage.setItem(INSTALL_DISMISS_KEY, '1'); } catch { /* storage unavailable */ }
+    setInstallDismissed(true);
+  };
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+  const showInstallBanner = isMobile && !installDismissed && (install.canPrompt || install.iosManual);
+
+  // Push tokens can rotate; refresh this device's registration once per session
+  useEffect(() => { if (currentUser?.uid) registerPush(currentUser.uid); }, [currentUser?.uid]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNudge, setShowNudge] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -191,6 +207,34 @@ function AppContent() {
     };
   }, [prefs.pinHash, prefs.autoLockTimeout, setLocked]);
 
+  // ── On-device alerts when a transaction is recorded ──────────────────
+  const addTransactionWithAlerts = async (tx) => {
+    await addTransaction(tx);
+    const n = prefs.notifications || {};
+    const amt = typeof tx.fxRate === 'number' ? tx.amount * tx.fxRate : (toBase(tx.amount, tx.currency) ?? 0);
+
+    if (n.largeTransaction && amt >= (n.largeTransactionThreshold || 500)) {
+      notify('Large transaction recorded', `${tx.description}: ${fmt(amt)}`, `large-${tx.date}`);
+    }
+    if (n.budgetAlert && tx.type === 'expense') {
+      const month  = tx.date.slice(0, 7);
+      const budget = budgets.find(b => b.month === month && (b.type || 'expense') === 'expense' && b.category === tx.category);
+      if (budget) {
+        const before = transactions
+          .filter(t => t.type === 'expense' && t.category === tx.category && t.date.startsWith(month))
+          .reduce((s, t) => s + t.baseAmount, 0);
+        const after = before + amt;
+        if (before < budget.amount && after >= budget.amount) {
+          notify(`Over budget: ${tx.category}`,
+            `You've spent ${fmt(after)} of your ${fmt(budget.amount)} ${tx.category} budget.`, `budget-${tx.category}`);
+        } else if (before < budget.amount * 0.8 && after >= budget.amount * 0.8) {
+          notify(`${tx.category} budget 80% used`,
+            `${fmt(budget.amount - after)} left of ${fmt(budget.amount)} this month.`, `budget-${tx.category}`);
+        }
+      }
+    }
+  };
+
   // ── Onboarding ─────────────────────────────────────────────────────────
   // Wait for the server to confirm there are no accounts: offline, an empty cache isn't proof of a new user
   const showOnboarding = !loading && accountsConfirmed && accounts.length === 0 && !sessionStorage.getItem(ONBOARD_SKIP_KEY);
@@ -281,6 +325,22 @@ function AppContent() {
         </div>
       )}
 
+      {showInstallBanner && (
+        <div className="nudge-banner install-banner">
+          <span className="nudge-icon"><img src="/logo-icon.svg" alt="" width={20} height={20} /></span>
+          <div className="nudge-text">
+            <strong>Install ESB Finance</strong>
+            <span>{install.canPrompt
+              ? ' for quick access from your home screen.'
+              : ' Tap Share, then "Add to Home Screen".'}</span>
+          </div>
+          {install.canPrompt && (
+            <button className="nudge-cta" onClick={async () => { if (await install.promptInstall()) dismissInstall(); }}>Install</button>
+          )}
+          <button className="nudge-dismiss" onClick={dismissInstall} title="Dismiss">✕</button>
+        </div>
+      )}
+
       <main className="app-main">
         {loading ? (
           <div className="data-loading">
@@ -304,7 +364,7 @@ function AppContent() {
             )}
             {activeTab === 'transactions' && (
               <Transactions
-                transactions={transactions} addTransaction={addTransaction}
+                transactions={transactions} addTransaction={addTransactionWithAlerts}
                 updateTransaction={updateTransaction} deleteTransaction={deleteTransaction}
                 accounts={accounts} debts={debts} assets={assets}
                 addTransfer={addTransfer} budgets={budgets}

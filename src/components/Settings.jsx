@@ -9,6 +9,8 @@ import { updateProfile, updateEmail, deleteUser } from 'firebase/auth';
 import { auth, db, clearLocalData } from '../firebase';
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { usePreferences, CURRENCIES } from '../contexts/PreferencesContext';
+import { useInstall } from '../pwa';
+import { notificationStatus, enableNotifications, notify, pushConfigured } from '../notifications';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
 } from '../hooks/useFinanceData';
@@ -456,14 +458,100 @@ function ManageCategoriesSection({ assets }) {
 
 // ─── 4. Notifications ─────────────────────────────────────────────────────
 
+function InstallRow() {
+  const { installed, canPrompt, iosManual, promptInstall } = useInstall();
+  const [showIosHelp, setShowIosHelp] = useState(false);
+
+  if (installed) {
+    return (
+      <SettingsRow label="Install app" hint="You're using the installed app">
+        <span className="settings-ok"><Check size={13} strokeWidth={2} /> Installed</span>
+      </SettingsRow>
+    );
+  }
+  return (
+    <>
+      <SettingsRow label="Install app" hint="Add ESB Finance to your home screen. Opens full-screen and works offline">
+        {canPrompt ? (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={promptInstall}>
+            <Download size={13} strokeWidth={1.6} /> Install
+          </button>
+        ) : iosManual ? (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={() => setShowIosHelp(v => !v)}>
+            How to install
+          </button>
+        ) : (
+          <span className="settings-row-hint">Use your browser menu → "Install app" / "Add to Home screen"</span>
+        )}
+      </SettingsRow>
+      {showIosHelp && (
+        <ol className="install-steps">
+          <li>Open this site in <strong>Safari</strong>.</li>
+          <li>Tap the <strong>Share</strong> button (square with an arrow).</li>
+          <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+          <li>Open ESB Finance from your home screen to turn on notifications.</li>
+        </ol>
+      )}
+    </>
+  );
+}
+
+function PushRow() {
+  const [status, setStatus] = useState(notificationStatus);
+  const [busy,   setBusy]   = useState(false);
+  const [msg,    setMsg]    = useState('');
+
+  const enable = async () => {
+    setBusy(true); setMsg('');
+    const { permission, push } = await enableNotifications(auth.currentUser?.uid);
+    setStatus(permission);
+    if (permission === 'granted') {
+      setMsg(push || !pushConfigured()
+        ? 'Notifications are on for this device.'
+        : 'Notifications are on, but this device could not be registered for reminders. Try again later.');
+    }
+    setBusy(false);
+  };
+
+  const hint = {
+    granted:         'On for this device',
+    denied:          'Blocked. Allow notifications for this site in your browser or phone settings',
+    default:         'Get alerts on this device',
+    'needs-install': 'On iPhone, install the app to your home screen first',
+    unsupported:     'Not supported in this browser',
+  }[status];
+
+  return (
+    <>
+      <SettingsRow label="Push notifications" hint={hint}>
+        {status === 'default' && (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={enable} disabled={busy}>
+            <Bell size={13} strokeWidth={1.6} /> {busy ? 'Enabling…' : 'Enable'}
+          </button>
+        )}
+        {status === 'granted' && (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }}
+            onClick={() => notify('Notifications are working', 'You\'ll get your ESB Finance alerts here.', 'test')}>
+            Send test
+          </button>
+        )}
+      </SettingsRow>
+      <StatusMsg msg={msg} error={msg.includes('could not')} />
+    </>
+  );
+}
+
 function NotificationsSection() {
-  const { prefs, updateNotifications } = usePreferences();
+  const { prefs, updateNotifications, currencySymbol } = usePreferences();
   const n = prefs.notifications;
 
   return (
     <Section icon={Bell} title="Notifications">
-      <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.6 }}>
-        Toggles are saved. In-app delivery is active; push notifications require a future update.
+      <InstallRow />
+      <PushRow />
+      <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '8px 0 4px', lineHeight: 1.6 }}>
+        Budget and large-transaction alerts notify you as you record transactions. Daily reminders and the
+        weekly digest show in the app for now; scheduled push delivery is coming in a later update.
       </p>
       <SettingsRow label="Budget alerts" hint="Warn when a category hits 80% of its budget">
         <Toggle checked={n.budgetAlert} onChange={v => updateNotifications({ budgetAlert: v })} />
@@ -481,7 +569,7 @@ function NotificationsSection() {
         <Toggle checked={n.largeTransaction} onChange={v => updateNotifications({ largeTransaction: v })} />
       </SettingsRow>
       {n.largeTransaction && (
-        <SettingsRow label="Large transaction threshold">
+        <SettingsRow label={`Large transaction threshold (${currencySymbol})`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
               type="number" min="1" step="1"
@@ -808,7 +896,7 @@ function DataSection({ transactions, accounts }) {
 
 // ─── 7. Account actions ────────────────────────────────────────────────────
 
-const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','preferences'];
+const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','preferences','pushTokens'];
 
 // Deletes every document in the user's subcollections, in batches of ≤500 (Firestore limit)
 async function wipeUserData(uid) {
