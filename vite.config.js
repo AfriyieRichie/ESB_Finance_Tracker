@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,   // registered in src/pwa.js so updates apply straight away
       includeAssets: ['favicon.svg', 'logo-icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'MiAhorro Pocket',

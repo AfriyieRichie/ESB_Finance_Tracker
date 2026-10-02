@@ -1,4 +1,20 @@
 import { useSyncExternalStore } from 'react';
+import { registerSW } from 'virtual:pwa-register';
+
+// Service worker with auto-update: when a new version has been downloaded it takes over and the
+// page reloads onto it, instead of showing the old cached version until a manual refresh.
+// Also look for a new version whenever the app is reopened/refocused, and hourly while open.
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registration) {
+    if (!registration) return;
+    const check = () => { if (navigator.onLine) registration.update(); };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') check();
+    });
+    setInterval(check, 60 * 60 * 1000);
+  },
+});
 
 // The browser fires `beforeinstallprompt` once, possibly before React mounts, so capture it at
 // module load (imported from main.jsx) and let components subscribe to it.
