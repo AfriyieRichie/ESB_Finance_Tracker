@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import BrandLogo from './BrandLogo';
 
 const ERROR_MESSAGES = {
   'auth/user-not-found':      'No account found with this email.',
@@ -77,8 +78,7 @@ export default function Auth() {
 
         {/* Brand */}
         <div className="auth-brand">
-          <img src="/logo-icon.svg" alt="MiAhorro Pocket" className="auth-logo" />
-          <span className="auth-brand-name">MiAhorro Pocket</span>
+          <BrandLogo className="auth-wordmark" />
         </div>
 
         <h2 className="auth-title">

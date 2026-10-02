@@ -9,6 +9,7 @@ import Transactions from './components/Transactions';
 import Accounts from './components/Accounts';
 import Settings from './components/Settings';
 import OnboardingWizard from './components/OnboardingWizard';
+import BrandLogo from './components/BrandLogo';
 import { useFinanceData } from './hooks/useFinanceData';
 import { useInstall } from './pwa';
 import { notify, registerPush } from './notifications';
@@ -258,8 +259,7 @@ function AppContent() {
     <div className="app">
       <header className="app-header">
         <div className="header-brand">
-          <img src="/logo-icon.svg" alt="MiAhorro Pocket" className="brand-logo" />
-          <span className="brand-name">MiAhorro Pocket</span>
+          <BrandLogo className="brand-wordmark" />
         </div>
 
         <nav className="header-nav">
@@ -327,7 +327,7 @@ function AppContent() {
 
       {showInstallBanner && (
         <div className="nudge-banner install-banner">
-          <span className="nudge-icon"><img src="/logo-icon.svg" alt="" width={20} height={20} /></span>
+          <span className="nudge-icon"><BrandLogo variant="icon" className="nudge-logo" /></span>
           <div className="nudge-text">
             <strong>Install MiAhorro</strong>
             <span>{install.canPrompt

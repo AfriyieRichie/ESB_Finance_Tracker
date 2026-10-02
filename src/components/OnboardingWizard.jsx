@@ -3,6 +3,7 @@ import { POPULAR_ACCOUNTS, GENERIC_ACCOUNTS } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS } from './CategoryIcon';
 import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
 import CurrencySelect from './CurrencySelect';
+import BrandLogo from './BrandLogo';
 
 export default function OnboardingWizard({ onComplete, onSkip }) {
   const { baseCurrency, updatePrefs } = usePreferences();
@@ -48,7 +49,7 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
     <div className="onboarding-overlay">
       <div className="onboarding-card">
         <div className="onboarding-header">
-          <img src="/logo-icon.svg" alt="MiAhorro Pocket" className="auth-logo" />
+          <BrandLogo variant="icon" className="auth-logo" />
           <div>
             <h2 className="onboarding-title">
               {step === 1 ? "Let's set up your accounts" : 'Enter your current balances'}
