@@ -71,9 +71,10 @@
 html, body, #root {
   height: 100%;
   min-height: 100vh;
-  /* respect iPhone notch / home bar */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+}
+/* iPhone notch / rounded corners: side insets once here; the header handles the top inset and
+   the bottom nav the home-bar inset (applying them on html, body AND #root tripled the gap) */
+#root {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }

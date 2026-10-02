@@ -2293,3 +2293,15 @@ img.logo-on-light { display: none; }
   .acct-card-right { flex-direction: column; align-items: flex-end; gap: 4px; }
   .acct-card-right .acct-actions { gap: 2px; }
 }
+
+/* ─── iPhone fixes ─────────────────────────────────────── */
+/* Header extends under the notch/status bar (installed app) and keeps its content below it */
+.app-header { padding-top: env(safe-area-inset-top); height: calc(68px + env(safe-area-inset-top)); }
+@media (max-width: 768px) { .app-header { height: calc(56px + env(safe-area-inset-top)); } }
+@media (max-width: 480px) { .app-header { height: calc(52px + env(safe-area-inset-top)); } }
+
+/* Safari zooms the page in when a text field under 16px is focused, and stays zoomed.
+   16px on touch devices prevents that without disabling pinch-zoom. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; }
+}
