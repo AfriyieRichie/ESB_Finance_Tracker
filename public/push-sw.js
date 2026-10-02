@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
 
   const n     = payload.notification || payload.data || {};
   const data  = payload.data || {};
-  const title = n.title || 'ESB Finance Tracker';
+  const title = n.title || 'MiAhorro';
 
   event.waitUntil(self.registration.showNotification(title, {
     body: n.body || '',

@@ -77,8 +77,8 @@ export default function Auth() {
 
         {/* Brand */}
         <div className="auth-brand">
-          <img src="/logo-icon.svg" alt="ESB" className="auth-logo" />
-          <span className="auth-brand-name">ESB Finance Tracker</span>
+          <img src="/logo-icon.svg" alt="MiAhorro Pocket" className="auth-logo" />
+          <span className="auth-brand-name">MiAhorro Pocket</span>
         </div>
 
         <h2 className="auth-title">
@@ -112,7 +112,7 @@ export default function Auth() {
               <label>Full Name</label>
               <input
                 type="text"
-                placeholder="e.g. Richie Afriyie"
+                placeholder="Your full name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 autoFocus

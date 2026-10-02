@@ -75,6 +75,16 @@ export const ASSET_TYPES = [
   { id: 'other',      label: 'Other',                  color: '#6b7280' },
 ];
 
+// Onboarding choices: generic account kinds work anywhere (in the user's base currency);
+// bank presets carry their own currency and are shown to users with that base currency.
+export const GENERIC_ACCOUNTS = [
+  { name: 'Bank Account',    type: 'bank',  color: '#3b82f6' },
+  { name: 'Savings Account', type: 'bank',  color: '#14b8a6' },
+  { name: 'Mobile Wallet',   type: 'momo',  color: '#eab308' },
+  { name: 'Cash',            type: 'cash',  color: '#22c55e' },
+  { name: 'Other',           type: 'other', color: '#6b7280' },
+];
+
 export const POPULAR_ACCOUNTS = [
   { name: 'GCB Bank',     type: 'bank',  color: '#e41e20', currency: 'GHS' },
   { name: 'Absa',         type: 'bank',  color: '#b31012', currency: 'GHS' },
@@ -91,8 +101,6 @@ export const POPULAR_ACCOUNTS = [
   { name: 'HSBC UK',      type: 'bank',  color: '#db0011', currency: 'GBP' },
   { name: 'Lloyds',       type: 'bank',  color: '#006a4d', currency: 'GBP' },
   { name: 'Nationwide',   type: 'bank',  color: '#1d1d6b', currency: 'GBP' },
-  { name: 'Cash',         type: 'cash',  color: '#22c55e' },
-  { name: 'Other',        type: 'other', color: '#6b7280' },
 ];
 
 // Maps savings category → asset type ID for auto-linking

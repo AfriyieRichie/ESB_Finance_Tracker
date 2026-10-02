@@ -64,7 +64,7 @@ function AccountModal({ existing, onSave, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
             <label>Account Name</label>
-            <input type="text" placeholder="e.g. MTN MoMo" value={name}
+            <input type="text" placeholder="e.g. Main bank account" value={name}
               onChange={e => setName(e.target.value)} autoFocus required />
           </div>
           <div className="form-group">
@@ -90,7 +90,7 @@ function AccountModal({ existing, onSave, onClose }) {
           {type === 'momo' && (
             <div className="form-group">
               <label>Phone Number (optional)</label>
-              <input type="tel" placeholder="024 000 0000" value={phone}
+              <input type="tel" placeholder="Phone number" value={phone}
                 onChange={e => setPhone(e.target.value)} />
             </div>
           )}
@@ -191,7 +191,7 @@ function DebtModal({ existing, onSave, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
             <label>Debt Name</label>
-            <input type="text" placeholder="e.g. Stanbic personal loan" value={name}
+            <input type="text" placeholder="e.g. Car loan" value={name}
               onChange={e => setName(e.target.value)} autoFocus required />
           </div>
           <div className="form-group">
@@ -230,7 +230,7 @@ function DebtModal({ existing, onSave, onClose }) {
           </div>
           <div className="form-group">
             <label>Notes (optional)</label>
-            <input type="text" placeholder="e.g. Family loan from Uncle Kofi"
+            <input type="text" placeholder="e.g. Loan from a family member"
               value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
           <div className="form-actions">
@@ -295,7 +295,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
             <label>Asset Name</label>
-            <input type="text" placeholder="e.g. Treasury Bills – GCB" value={name}
+            <input type="text" placeholder="e.g. Government bonds" value={name}
               onChange={e => setName(e.target.value)} autoFocus required />
           </div>
           <div className="form-group">
@@ -713,7 +713,7 @@ function TransferModal({ accounts, onTransfer, onClose }) {
           )}
           <div className="form-group">
             <label>Description (optional)</label>
-            <input type="text" placeholder="e.g. Moving savings to MoMo"
+            <input type="text" placeholder="e.g. Moving money to savings"
               value={desc} onChange={e => setDesc(e.target.value)} />
           </div>
           {error && <p className="transfer-error">{error}</p>}

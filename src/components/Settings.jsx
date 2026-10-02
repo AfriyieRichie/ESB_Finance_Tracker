@@ -471,7 +471,7 @@ function InstallRow() {
   }
   return (
     <>
-      <SettingsRow label="Install app" hint="Add ESB Finance to your home screen. Opens full-screen and works offline">
+      <SettingsRow label="Install app" hint="Add MiAhorro to your home screen. Opens full-screen and works offline">
         {canPrompt ? (
           <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={promptInstall}>
             <Download size={13} strokeWidth={1.6} /> Install
@@ -489,7 +489,7 @@ function InstallRow() {
           <li>Open this site in <strong>Safari</strong>.</li>
           <li>Tap the <strong>Share</strong> button (square with an arrow).</li>
           <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
-          <li>Open ESB Finance from your home screen to turn on notifications.</li>
+          <li>Open MiAhorro from your home screen to turn on notifications.</li>
         </ol>
       )}
     </>
@@ -531,7 +531,7 @@ function PushRow() {
         )}
         {status === 'granted' && (
           <button type="button" className="btn-ghost" style={{ fontSize: 13 }}
-            onClick={() => notify('Notifications are working', 'You\'ll get your ESB Finance alerts here.', 'test')}>
+            onClick={() => notify('Notifications are working', 'You\'ll get your MiAhorro alerts here.', 'test')}>
             Send test
           </button>
         )}

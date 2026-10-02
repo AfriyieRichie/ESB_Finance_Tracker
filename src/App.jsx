@@ -258,8 +258,8 @@ function AppContent() {
     <div className="app">
       <header className="app-header">
         <div className="header-brand">
-          <img src="/logo-icon.svg" alt="ESB Finance Tracker" className="brand-logo" />
-          <span className="brand-name">ESB Finance Tracker</span>
+          <img src="/logo-icon.svg" alt="MiAhorro Pocket" className="brand-logo" />
+          <span className="brand-name">MiAhorro Pocket</span>
         </div>
 
         <nav className="header-nav">
@@ -329,7 +329,7 @@ function AppContent() {
         <div className="nudge-banner install-banner">
           <span className="nudge-icon"><img src="/logo-icon.svg" alt="" width={20} height={20} /></span>
           <div className="nudge-text">
-            <strong>Install ESB Finance</strong>
+            <strong>Install MiAhorro</strong>
             <span>{install.canPrompt
               ? ' for quick access from your home screen.'
               : ' Tap Share, then "Add to Home Screen".'}</span>

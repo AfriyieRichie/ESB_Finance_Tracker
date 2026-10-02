@@ -7,17 +7,81 @@ import { useExchangeRates } from '../hooks/useExchangeRates';
 // ─── Currency catalogue ────────────────────────────────────────────────────
 
 export const CURRENCIES = [
-  { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi'         },
-  { code: 'USD', symbol: '$',    name: 'US Dollar'             },
-  { code: 'GBP', symbol: '£',   name: 'British Pound'         },
-  { code: 'EUR', symbol: '€',   name: 'Euro'                  },
-  { code: 'NGN', symbol: '₦',   name: 'Nigerian Naira'        },
-  { code: 'ZAR', symbol: 'R',   name: 'South African Rand'    },
-  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling'       },
-  { code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc'},
-  { code: 'CAD', symbol: 'C$',  name: 'Canadian Dollar'       },
-  { code: 'AUD', symbol: 'A$',  name: 'Australian Dollar'     },
+  { code: 'USD', symbol: '$',    name: 'US Dollar'               },
+  { code: 'EUR', symbol: '€',    name: 'Euro'                    },
+  { code: 'GBP', symbol: '£',    name: 'British Pound'           },
+  { code: 'GHS', symbol: 'GH₵',  name: 'Ghanaian Cedi'           },
+  { code: 'NGN', symbol: '₦',    name: 'Nigerian Naira'          },
+  { code: 'KES', symbol: 'KSh',  name: 'Kenyan Shilling'         },
+  { code: 'ZAR', symbol: 'R',    name: 'South African Rand'      },
+  { code: 'XOF', symbol: 'CFA',  name: 'West African CFA Franc'  },
+  { code: 'XAF', symbol: 'FCFA', name: 'Central African CFA Franc' },
+  { code: 'EGP', symbol: 'E£',   name: 'Egyptian Pound'          },
+  { code: 'MAD', symbol: 'DH',   name: 'Moroccan Dirham'         },
+  { code: 'UGX', symbol: 'USh',  name: 'Ugandan Shilling'        },
+  { code: 'TZS', symbol: 'TSh',  name: 'Tanzanian Shilling'      },
+  { code: 'RWF', symbol: 'FRw',  name: 'Rwandan Franc'           },
+  { code: 'ETB', symbol: 'Br',   name: 'Ethiopian Birr'          },
+  { code: 'CAD', symbol: 'C$',   name: 'Canadian Dollar'         },
+  { code: 'AUD', symbol: 'A$',   name: 'Australian Dollar'       },
+  { code: 'NZD', symbol: 'NZ$',  name: 'New Zealand Dollar'      },
+  { code: 'CHF', symbol: 'CHF',  name: 'Swiss Franc'             },
+  { code: 'SEK', symbol: 'kr',   name: 'Swedish Krona'           },
+  { code: 'NOK', symbol: 'kr',   name: 'Norwegian Krone'         },
+  { code: 'DKK', symbol: 'kr',   name: 'Danish Krone'            },
+  { code: 'PLN', symbol: 'zł',   name: 'Polish Złoty'            },
+  { code: 'TRY', symbol: '₺',    name: 'Turkish Lira'            },
+  { code: 'AED', symbol: 'AED',  name: 'UAE Dirham'              },
+  { code: 'SAR', symbol: 'SAR',  name: 'Saudi Riyal'             },
+  { code: 'INR', symbol: '₹',    name: 'Indian Rupee'            },
+  { code: 'PKR', symbol: 'Rs',   name: 'Pakistani Rupee'         },
+  { code: 'BDT', symbol: '৳',    name: 'Bangladeshi Taka'        },
+  { code: 'CNY', symbol: '¥',    name: 'Chinese Yuan'            },
+  { code: 'JPY', symbol: '¥',    name: 'Japanese Yen'            },
+  { code: 'SGD', symbol: 'S$',   name: 'Singapore Dollar'        },
+  { code: 'MYR', symbol: 'RM',   name: 'Malaysian Ringgit'       },
+  { code: 'PHP', symbol: '₱',    name: 'Philippine Peso'         },
+  { code: 'IDR', symbol: 'Rp',   name: 'Indonesian Rupiah'       },
+  { code: 'BRL', symbol: 'R$',   name: 'Brazilian Real'          },
+  { code: 'MXN', symbol: 'MX$',  name: 'Mexican Peso'            },
 ];
+
+// Country (ISO region) → currency, for guessing a new user's base currency
+const REGION_CURRENCY = {
+  US: 'USD', GB: 'GBP', IE: 'EUR', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', BE: 'EUR',
+  PT: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR', GH: 'GHS', NG: 'NGN', KE: 'KES', ZA: 'ZAR',
+  SN: 'XOF', CI: 'XOF', BJ: 'XOF', TG: 'XOF', BF: 'XOF', ML: 'XOF', NE: 'XOF', CM: 'XAF', GA: 'XAF',
+  EG: 'EGP', MA: 'MAD', UG: 'UGX', TZ: 'TZS', RW: 'RWF', ET: 'ETB', CA: 'CAD', AU: 'AUD', NZ: 'NZD',
+  CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', TR: 'TRY', AE: 'AED', SA: 'SAR', IN: 'INR',
+  PK: 'PKR', BD: 'BDT', CN: 'CNY', JP: 'JPY', SG: 'SGD', MY: 'MYR', PH: 'PHP', ID: 'IDR', BR: 'BRL', MX: 'MXN',
+};
+// Time zone → country; more reliable than the language setting (many phones use en-US everywhere)
+const TZ_REGION = {
+  'Europe/London': 'GB', 'Africa/Accra': 'GH', 'Africa/Lagos': 'NG', 'Africa/Nairobi': 'KE',
+  'Africa/Johannesburg': 'ZA', 'Africa/Dakar': 'SN', 'Africa/Abidjan': 'CI', 'Africa/Douala': 'CM',
+  'Africa/Cairo': 'EG', 'Africa/Casablanca': 'MA', 'Africa/Kampala': 'UG', 'Africa/Dar_es_Salaam': 'TZ',
+  'Africa/Kigali': 'RW', 'Africa/Addis_Ababa': 'ET', 'Europe/Dublin': 'IE', 'Europe/Berlin': 'DE',
+  'Europe/Paris': 'FR', 'Europe/Madrid': 'ES', 'Europe/Rome': 'IT', 'Europe/Amsterdam': 'NL',
+  'Europe/Zurich': 'CH', 'Europe/Stockholm': 'SE', 'Europe/Oslo': 'NO', 'Europe/Copenhagen': 'DK',
+  'Europe/Warsaw': 'PL', 'Europe/Istanbul': 'TR', 'Asia/Dubai': 'AE', 'Asia/Riyadh': 'SA',
+  'Asia/Kolkata': 'IN', 'Asia/Karachi': 'PK', 'Asia/Dhaka': 'BD', 'Asia/Shanghai': 'CN', 'Asia/Tokyo': 'JP',
+  'Asia/Singapore': 'SG', 'Asia/Kuala_Lumpur': 'MY', 'Asia/Manila': 'PH', 'Asia/Jakarta': 'ID',
+  'America/Sao_Paulo': 'BR', 'America/Mexico_City': 'MX', 'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU',
+  'Pacific/Auckland': 'NZ', 'America/Toronto': 'CA', 'America/Vancouver': 'CA',
+};
+
+export function guessCurrency() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const fromTz = REGION_CURRENCY[TZ_REGION[tz]];
+    if (fromTz) return fromTz;
+    if (tz?.startsWith('America/')) return 'USD';
+    const region = (navigator.language || '').split('-')[1]?.toUpperCase();
+    return REGION_CURRENCY[region] || 'USD';
+  } catch {
+    return 'USD';
+  }
+}
 
 export const symbolFor = (code) => CURRENCIES.find(c => c.code === code)?.symbol || code;
 
@@ -25,6 +89,7 @@ export const symbolFor = (code) => CURRENCIES.find(c => c.code === code)?.symbol
 
 const DEFAULT_PREFS = {
   currency:          'GHS',     // base currency: totals, budgets and reports are converted into it
+                                // (new users get guessCurrency(); 'GHS' is the legacy default)
   fxOverrides:       {},        // { "GBP:GHS": 15.2 } = your own rate, units of GHS per 1 GBP
   theme:             'dark',
   numberFormat:      'comma',   // 'comma' = 1,000.00 | 'period' = 1.000,00
@@ -72,7 +137,15 @@ export function PreferencesProvider({ children, userId }) {
     if (!userId) { setPrefsLoading(false); return; }
     const unsub = onSnapshot(
       doc(db, 'users', userId, 'preferences', 'main'),
+      { includeMetadataChanges: true },   // so we also hear when the server confirms "no doc"
       (snap) => {
+        if (!snap.exists() && !snap.metadata.fromCache) {
+          // New user (or after "Reset all data"), confirmed by the server rather than an empty
+          // offline cache: start from the currency of where they are
+          const currency = guessCurrency();
+          setPrefs(p => ({ ...p, currency }));
+          setDoc(snap.ref, { currency }, { merge: true });
+        }
         if (snap.exists()) {
           const data   = snap.data();
           const merged = {
