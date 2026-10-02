@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { POPULAR_ACCOUNTS, ACCOUNT_TYPES } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS } from './CategoryIcon';
-import { useFmt } from '../contexts/PreferencesContext';
+import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
+import CurrencySelect from './CurrencySelect';
 
 export default function OnboardingWizard({ onComplete, onSkip }) {
-  const fmt = useFmt();
+  const { baseCurrency, updatePrefs } = usePreferences();
   const [step, setStep]       = useState(1); // 1 = pick accounts, 2 = enter balances
   const [selected, setSelected] = useState([]); // array of { name, type, color }
-  const [balances, setBalances] = useState({}); // { accountName: { balance, phone } }
+  const [balances, setBalances] = useState({}); // { accountName: { balance, phone, currency } }
 
   const toggle = (acct) => {
     setSelected(prev =>
@@ -20,7 +21,7 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
   const handleNext = () => {
     if (selected.length === 0) return;
     const init = {};
-    selected.forEach(a => { init[a.name] = { balance: '', phone: '' }; });
+    selected.forEach(a => { init[a.name] = { balance: '', phone: '', currency: a.currency || baseCurrency }; });
     setBalances(init);
     setStep(2);
   };
@@ -32,7 +33,7 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
       color:    a.color,
       balance:  parseFloat(balances[a.name]?.balance) || 0,
       phone:    balances[a.name]?.phone || '',
-      currency: 'GHS',
+      currency: balances[a.name]?.currency || baseCurrency,
     }));
     await onComplete(accounts);
   };
@@ -56,6 +57,10 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
 
         {step === 1 ? (
           <>
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label>Main currency (totals and budgets are shown in this)</label>
+              <CurrencySelect value={baseCurrency} onChange={code => updatePrefs({ currency: code })} />
+            </div>
             <div className="onboarding-grid">
               {POPULAR_ACCOUNTS.map(acct => {
                 const Icon = ACCOUNT_TYPE_ICONS[acct.type];
@@ -99,7 +104,14 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
                     </div>
                     <div className="ob-inputs">
                       <div className="form-group">
-                        <label>Current Balance (GH₵)</label>
+                        <label>Currency</label>
+                        <CurrencySelect
+                          value={balances[acct.name]?.currency || baseCurrency}
+                          onChange={code => setBalances(p => ({ ...p, [acct.name]: { ...p[acct.name], currency: code } }))}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Current Balance ({symbolFor(balances[acct.name]?.currency || baseCurrency)})</label>
                         <input
                           type="number"
                           min="0"

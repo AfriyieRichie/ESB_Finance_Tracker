@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
 import {
   collection, doc, addDoc, deleteDoc, setDoc, onSnapshot,
-  updateDoc, increment, writeBatch,
+  updateDoc, increment, writeBatch, deleteField,
 } from 'firebase/firestore';
 
 // ─── Expense Categories ────────────────────────────────────────────────────
@@ -76,15 +76,21 @@ export const ASSET_TYPES = [
 ];
 
 export const POPULAR_ACCOUNTS = [
-  { name: 'GCB Bank',     type: 'bank',  color: '#e41e20' },
-  { name: 'Absa',         type: 'bank',  color: '#b31012' },
-  { name: 'Ecobank',      type: 'bank',  color: '#0072bc' },
-  { name: 'Fidelity',     type: 'bank',  color: '#4f46e5' },
-  { name: 'Stanbic',      type: 'bank',  color: '#0ea5e9' },
-  { name: 'Cal Bank',     type: 'bank',  color: '#7c3aed' },
-  { name: 'MTN MoMo',     type: 'momo',  color: '#eab308' },
-  { name: 'Telecel Cash', type: 'momo',  color: '#dc2626' },
-  { name: 'AirtelTigo',   type: 'momo',  color: '#f97316' },
+  { name: 'GCB Bank',     type: 'bank',  color: '#e41e20', currency: 'GHS' },
+  { name: 'Absa',         type: 'bank',  color: '#b31012', currency: 'GHS' },
+  { name: 'Ecobank',      type: 'bank',  color: '#0072bc', currency: 'GHS' },
+  { name: 'Fidelity',     type: 'bank',  color: '#4f46e5', currency: 'GHS' },
+  { name: 'Stanbic',      type: 'bank',  color: '#0ea5e9', currency: 'GHS' },
+  { name: 'Cal Bank',     type: 'bank',  color: '#7c3aed', currency: 'GHS' },
+  { name: 'MTN MoMo',     type: 'momo',  color: '#eab308', currency: 'GHS' },
+  { name: 'Telecel Cash', type: 'momo',  color: '#dc2626', currency: 'GHS' },
+  { name: 'AirtelTigo',   type: 'momo',  color: '#f97316', currency: 'GHS' },
+  { name: 'Monzo',        type: 'bank',  color: '#ff4f40', currency: 'GBP' },
+  { name: 'Revolut',      type: 'bank',  color: '#0666eb', currency: 'GBP' },
+  { name: 'Barclays',     type: 'bank',  color: '#00aeef', currency: 'GBP' },
+  { name: 'HSBC UK',      type: 'bank',  color: '#db0011', currency: 'GBP' },
+  { name: 'Lloyds',       type: 'bank',  color: '#006a4d', currency: 'GBP' },
+  { name: 'Nationwide',   type: 'bank',  color: '#1d1d6b', currency: 'GBP' },
   { name: 'Cash',         type: 'cash',  color: '#22c55e' },
   { name: 'Other',        type: 'other', color: '#6b7280' },
 ];
@@ -112,6 +118,11 @@ const ASSET_TYPE_TO_CATEGORY = {
   mutualfund: 'Mutual Funds',
   other:      'Others',
 };
+
+// Amounts linked to a debt/asset are stored in that debt's/asset's currency when it differs
+// from the paying account's (debtAmount / assetAmount); otherwise the tx amount applies.
+const debtAmt  = t => t.debtAmount  ?? t.amount;
+const assetAmt = t => t.assetAmount ?? t.amount;
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
@@ -168,14 +179,14 @@ export function useFinanceData(userId) {
 
     // If debt repayment, reduce debt balance
     if (t.debtId) {
-      batch.update(doc(db, 'users', userId, 'debts', t.debtId), { currentBalance: increment(-t.amount) });
+      batch.update(doc(db, 'users', userId, 'debts', t.debtId), { currentBalance: increment(-debtAmt(t)) });
     }
 
     // If savings linked to an asset, increase cost basis
     if (t.type === 'savings' && t.assetId) {
       batch.update(doc(db, 'users', userId, 'assets', t.assetId), {
-        costBasis:    increment(t.amount),
-        currentValue: increment(t.amount),
+        costBasis:    increment(assetAmt(t)),
+        currentValue: increment(assetAmt(t)),
       });
     }
 
@@ -192,7 +203,7 @@ export function useFinanceData(userId) {
     if (tx.type === 'transfer') {
       // Reverse both sides of the transfer
       if (tx.fromAccountId) batch.update(doc(db, 'users', userId, 'accounts', tx.fromAccountId), { balance: increment(tx.amount) });
-      if (tx.toAccountId)   batch.update(doc(db, 'users', userId, 'accounts', tx.toAccountId),   { balance: increment(-tx.amount) });
+      if (tx.toAccountId)   batch.update(doc(db, 'users', userId, 'accounts', tx.toAccountId),   { balance: increment(-(tx.toAmount ?? tx.amount)) });
     } else {
       // Reverse account balance for regular transactions
       if (tx.accountId) {
@@ -201,13 +212,13 @@ export function useFinanceData(userId) {
       }
       // Reverse debt reduction
       if (tx.debtId) {
-        batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(tx.amount) });
+        batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(debtAmt(tx)) });
       }
       // Reverse asset cost basis
       if (tx.type === 'savings' && tx.assetId) {
         batch.update(doc(db, 'users', userId, 'assets', tx.assetId), {
-          costBasis:    increment(-tx.amount),
-          currentValue: increment(-tx.amount),
+          costBasis:    increment(-assetAmt(tx)),
+          currentValue: increment(-assetAmt(tx)),
         });
       }
     }
@@ -215,14 +226,19 @@ export function useFinanceData(userId) {
     await batch.commit();
   }, [userId, transactions]);
 
-  const addTransfer = useCallback(async ({ fromAccountId, toAccountId, amount, description, date }) => {
+  // amount is in the source account's currency; toAmount (if given) is what arrived in the
+  // destination account's currency, so cross-currency transfers record the real rate incl. fees
+  const addTransfer = useCallback(async ({ fromAccountId, toAccountId, amount, toAmount, description, date, ...meta }) => {
     const batch = writeBatch(db);
+    const received = toAmount ?? amount;
 
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
     batch.set(txRef, {
+      ...meta,
       type:          'transfer',
       description:   description || 'Transfer',
       amount,
+      toAmount:      received,
       fromAccountId,
       toAccountId,
       accountId:     fromAccountId,
@@ -230,7 +246,7 @@ export function useFinanceData(userId) {
     });
 
     batch.update(doc(db, 'users', userId, 'accounts', fromAccountId), { balance: increment(-amount) });
-    batch.update(doc(db, 'users', userId, 'accounts', toAccountId),   { balance: increment(amount) });
+    batch.update(doc(db, 'users', userId, 'accounts', toAccountId),   { balance: increment(received) });
 
     await batch.commit();
   }, [userId]);
@@ -277,8 +293,10 @@ export function useFinanceData(userId) {
 
   // ── Assets ──────────────────────────────────────────────────────────────
 
-  // Creates the asset record + an auto-generated savings transaction + deducts from source account
-  const addAsset = useCallback(async (asset, sourceAccountId) => {
+  // Creates the asset record + an auto-generated savings transaction + deducts from source account.
+  // sourceAmount is the cost in the source account's currency (defaults to costBasis); txMeta adds
+  // currency/fxRate fields to the generated transaction.
+  const addAsset = useCallback(async (asset, sourceAccountId, sourceAmount, txMeta = {}) => {
     const batch = writeBatch(db);
 
     const assetRef = doc(collection(db, 'users', userId, 'assets'));
@@ -286,9 +304,12 @@ export function useFinanceData(userId) {
 
     if (sourceAccountId && asset.costBasis > 0) {
       const txRef = doc(collection(db, 'users', userId, 'transactions'));
+      const paid  = sourceAmount ?? asset.costBasis;
       batch.set(txRef, {
+        ...txMeta,
         description: `Investment: ${asset.name}`,
-        amount:      asset.costBasis,
+        amount:      paid,
+        assetAmount: asset.costBasis,
         type:        'savings',
         category:    ASSET_TYPE_TO_CATEGORY[asset.assetType] || 'Others',
         date:        new Date().toISOString().slice(0, 10),
@@ -296,11 +317,15 @@ export function useFinanceData(userId) {
         assetId:     assetRef.id,
       });
       batch.update(doc(db, 'users', userId, 'accounts', sourceAccountId), {
-        balance: increment(-asset.costBasis),
+        balance: increment(-paid),
       });
     }
 
     await batch.commit();
+  }, [userId]);
+
+  const updateAsset = useCallback(async (id, updates) => {
+    await updateDoc(doc(db, 'users', userId, 'assets', id), updates);
   }, [userId]);
 
   const updateAssetValue = useCallback(async (id, newValue) => {
@@ -308,7 +333,7 @@ export function useFinanceData(userId) {
   }, [userId]);
 
   // Cash out: marks asset done, creates income tx, credits target account
-  const cashOutAsset = useCallback(async (id, receivedAmount, toAccountId) => {
+  const cashOutAsset = useCallback(async (id, receivedAmount, toAccountId, txMeta = {}) => {
     const asset = assets.find(a => a.id === id);
     if (!asset) return;
 
@@ -322,6 +347,7 @@ export function useFinanceData(userId) {
 
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
     batch.set(txRef, {
+      ...txMeta,
       description: `Cash out: ${asset.name}`,
       amount:      receivedAmount,
       type:        'income',
@@ -357,7 +383,12 @@ export function useFinanceData(userId) {
   const updateTransaction = useCallback(async (original, updates) => {
     const batch = writeBatch(db);
 
-    batch.update(doc(db, 'users', userId, 'transactions', original.id), updates);
+    // Remove links (and their converted amounts) that the edit dropped
+    const writeUpdates = { ...updates };
+    ['debtId', 'assetId', 'debtAmount', 'assetAmount'].forEach(k => {
+      if (original[k] !== undefined && updates[k] === undefined) writeUpdates[k] = deleteField();
+    });
+    batch.update(doc(db, 'users', userId, 'transactions', original.id), writeUpdates);
 
     if (original.type !== 'transfer') {
       const oldAccId = original.accountId;
@@ -378,21 +409,25 @@ export function useFinanceData(userId) {
         batch.update(doc(db, 'users', userId, 'accounts', newAccId), { balance: increment(effect(newType, newAmt)) });
       }
 
-      // Debt adjustment
+      // Debt adjustment (amounts in the debt's currency)
+      const oldDebt = debtAmt(original);
+      const newDebt = updates.debtAmount ?? newAmt;
       if (original.debtId && original.debtId !== updates.debtId)
-        batch.update(doc(db, 'users', userId, 'debts', original.debtId), { currentBalance: increment(oldAmt) });
+        batch.update(doc(db, 'users', userId, 'debts', original.debtId), { currentBalance: increment(oldDebt) });
       if (updates.debtId && updates.debtId !== original.debtId)
-        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(-newAmt) });
-      else if (updates.debtId && updates.debtId === original.debtId && newAmt !== oldAmt)
-        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(oldAmt - newAmt) });
+        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(-newDebt) });
+      else if (updates.debtId && updates.debtId === original.debtId && newDebt !== oldDebt)
+        batch.update(doc(db, 'users', userId, 'debts', updates.debtId), { currentBalance: increment(oldDebt - newDebt) });
 
-      // Asset adjustment (savings linked to asset)
+      // Asset adjustment (savings linked to asset, amounts in the asset's currency)
+      const oldAsset = assetAmt(original);
+      const newAsset = updates.assetAmount ?? newAmt;
       if (original.assetId && original.assetId !== updates.assetId)
-        batch.update(doc(db, 'users', userId, 'assets', original.assetId), { currentValue: increment(-oldAmt), costBasis: increment(-oldAmt) });
+        batch.update(doc(db, 'users', userId, 'assets', original.assetId), { currentValue: increment(-oldAsset), costBasis: increment(-oldAsset) });
       if (updates.assetId && updates.assetId !== original.assetId)
-        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAmt), costBasis: increment(newAmt) });
-      else if (updates.assetId && updates.assetId === original.assetId && newAmt !== oldAmt)
-        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAmt - oldAmt), costBasis: increment(newAmt - oldAmt) });
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset), costBasis: increment(newAsset) });
+      else if (updates.assetId && updates.assetId === original.assetId && newAsset !== oldAsset)
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset - oldAsset), costBasis: increment(newAsset - oldAsset) });
     }
 
     await batch.commit();
@@ -405,7 +440,7 @@ export function useFinanceData(userId) {
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
-    addAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     getSpending,
   };
 }

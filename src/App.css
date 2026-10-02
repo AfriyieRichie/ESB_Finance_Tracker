@@ -2012,3 +2012,60 @@
   .currency-picker         { width: 100%; }
   .seg-control             { width: 100%; }
 }
+
+/* ─── Multi-currency ──────────────────────────────────── */
+.fx-approx {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.acct-balance-wrap { display: flex; flex-direction: column; align-items: flex-end; }
+.fx-hint {
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+.fx-warning {
+  font-size: 13px;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin: 0;
+  line-height: 1.5;
+}
+.fx-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.fx-breakdown--card { border-top: none; padding-top: 8px; gap: 6px; }
+.fx-chip {
+  display: inline-flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+.fx-breakdown--card .fx-chip { font-size: 12px; padding: 4px 8px; }
+.fx-rate { flex-basis: 100%; font-size: 11.5px; color: var(--text-3); }
+.fx-rate-input {
+  width: 110px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 14px;
+  color: var(--text-1);
+}

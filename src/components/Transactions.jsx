@@ -13,12 +13,13 @@ function TypeBadge({ type }) {
   );
 }
 import { getCategoriesForType } from '../hooks/useFinanceData';
-import { useFmt, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
+import { usePreferences, useEffectiveCategoriesForType, symbolFor } from '../contexts/PreferencesContext';
+import { BaseApprox } from './CurrencySelect';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
 function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, addTransfer, budgets, existing }) {
-  const fmt = useFmt();
+  const { fmtCur, convert, txFxMeta } = usePreferences();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
   const savingsCats = useEffectiveCategoriesForType('savings');
@@ -58,10 +59,34 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
     setAssetId('');
   };
 
+  const account  = accounts.find(a => a.id === accountId);
+  const currency = account?.currency;
+  const linkedDebt  = isDebtRepay && debtId ? debts.find(d => d.id === debtId) : null;
+  const linkedAsset = type === 'savings' && assetId ? assets.find(a => a.id === assetId) : null;
+
+  // Amount in a linked debt's/asset's own currency, when it differs from the account's
+  const linkedAmount = (target) => {
+    if (!target || !currency || target.currency === currency || !amount) return null;
+    const v = convert(Number(amount), currency, target.currency);
+    return v === null ? null : Math.round(v * 100) / 100;
+  };
+  const debtAmount  = linkedAmount(linkedDebt);
+  const assetAmount = linkedAmount(linkedAsset);
+
   const buildTx = () => {
-    const tx = { description, amount: Number(amount), type, category, date, accountId };
-    if (isDebtRepay && debtId) tx.debtId  = debtId;
-    if (type === 'savings' && assetId) tx.assetId = assetId;
+    // Keep the original rate when editing within the same currency, so history doesn't drift
+    const fx = isEdit && existing.currency === currency && typeof existing.fxRate === 'number'
+      ? { currency, baseCurrency: existing.baseCurrency, fxRate: existing.fxRate }
+      : txFxMeta(currency);
+    const tx = { description, amount: Number(amount), type, category, date, accountId, ...fx };
+    if (linkedDebt) {
+      tx.debtId = debtId;
+      if (debtAmount !== null) tx.debtAmount = debtAmount;
+    }
+    if (linkedAsset) {
+      tx.assetId = assetId;
+      if (assetAmount !== null) tx.assetAmount = assetAmount;
+    }
     return tx;
   };
 
@@ -91,13 +116,22 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
 
   const confirmAnyway = () => { onSave(buildTx()); onClose(); };
 
+  // Mini top-up: miniAmt is what should arrive in this account; the source pays the converted amount
+  const miniSource   = accounts.find(a => a.id === miniFrom);
+  const miniCross    = miniSource && miniSource.currency !== currency;
+  const miniSendAmt  = miniSource && miniAmt
+    ? (miniCross ? convert(parseFloat(miniAmt), currency, miniSource.currency) : parseFloat(miniAmt))
+    : null;
+
   const handleMiniTransfer = async () => {
-    if (!miniFrom || !miniAmt) return;
+    if (!miniFrom || !miniAmt || miniSendAmt === null) return;
     setMiniBusy(true);
     await addTransfer({
+      ...txFxMeta(miniSource.currency),
       fromAccountId: miniFrom,
       toAccountId:   accountId,
-      amount:        parseFloat(miniAmt),
+      amount:        Math.round(miniSendAmt * 100) / 100,
+      ...(miniCross ? { toAmount: parseFloat(miniAmt), toCurrency: currency } : {}),
       description:   'Transfer',
       date,
     });
@@ -127,9 +161,9 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
             <h4 className="modal-warning-title">Insufficient Account Balance</h4>
             <p className="modal-warning-text">
               <strong>{warning.account.name}</strong> only has{' '}
-              <span className="mw-balance">{fmt(warning.account.balance)}</span> available.
+              <span className="mw-balance">{fmtCur(warning.account.balance, warning.account.currency)}</span> available.
               You need{' '}
-              <span className="mw-shortfall">{fmt(warning.shortfall)} more</span> to complete this transaction.
+              <span className="mw-shortfall">{fmtCur(warning.shortfall, warning.account.currency)} more</span> to complete this transaction.
             </p>
             {otherAccounts.length > 0 && (
               <>
@@ -138,12 +172,12 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                   <select value={miniFrom} onChange={e => setMiniFrom(e.target.value)}>
                     <option value="">— From account —</option>
                     {otherAccounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                      <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
                     ))}
                   </select>
                   <input
                     type="number" min="0.01" step="0.01"
-                    placeholder={fmt(warning.shortfall)}
+                    placeholder={fmtCur(warning.shortfall, warning.account.currency)}
                     value={miniAmt}
                     onChange={e => setMiniAmt(e.target.value)}
                   />
@@ -151,12 +185,19 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                     type="button"
                     className="btn-primary"
                     style={{ whiteSpace: 'nowrap' }}
-                    disabled={!miniFrom || !miniAmt || miniBusy}
+                    disabled={!miniFrom || !miniAmt || miniBusy || miniSendAmt === null}
                     onClick={handleMiniTransfer}
                   >
                     {miniBusy ? '…' : 'Transfer'}
                   </button>
                 </div>
+                {miniCross && miniAmt && (
+                  <p className="fx-hint">
+                    {miniSendAmt === null
+                      ? `No ${miniSource.currency}/${currency} rate available.`
+                      : `≈ ${fmtCur(miniSendAmt, miniSource.currency)} will leave ${miniSource.name} at today's rate.`}
+                  </p>
+                )}
               </>
             )}
             <div className="modal-warning-actions">
@@ -188,7 +229,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
 
             <div className="form-row">
               <div className="form-group">
-                <label>Amount (GH₵)</label>
+                <label>Amount{currency ? ` (${symbolFor(currency)})` : ''}</label>
                 <input type="number" min="0.01" step="0.01" placeholder="0.00" value={amount}
                   onChange={e => setAmount(e.target.value)} required />
               </div>
@@ -221,7 +262,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                 <select value={accountId} onChange={e => setAccountId(e.target.value)} required>
                   <option value="">— Select account —</option>
                   {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
+                    <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>
                   ))}
                 </select>
               )}
@@ -233,9 +274,16 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                 <select value={debtId} onChange={e => setDebtId(e.target.value)}>
                   <option value="">— Select debt —</option>
                   {debts.map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>{d.name} · {d.currency}</option>
                   ))}
                 </select>
+                {linkedDebt && linkedDebt.currency !== currency && amount && (
+                  <p className="fx-hint">
+                    {debtAmount === null
+                      ? `No rate available. The debt will be reduced by the same number in ${linkedDebt.currency}.`
+                      : `≈ ${fmtCur(debtAmount, linkedDebt.currency)} will come off this debt.`}
+                  </p>
+                )}
               </div>
             )}
 
@@ -245,9 +293,16 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                 <select value={assetId} onChange={e => setAssetId(e.target.value)}>
                   <option value="">— None —</option>
                   {activeAssets.map(a => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
+                    <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>
                   ))}
                 </select>
+                {linkedAsset && linkedAsset.currency !== currency && amount && (
+                  <p className="fx-hint">
+                    {assetAmount === null
+                      ? `No rate available. The asset will grow by the same number in ${linkedAsset.currency}.`
+                      : `≈ ${fmtCur(assetAmount, linkedAsset.currency)} will be added to this asset.`}
+                  </p>
+                )}
               </div>
             )}
 
@@ -307,7 +362,7 @@ function CategoryDropdown({ value, onChange, categories }) {
 }
 
 export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
-  const fmt = useFmt();
+  const { fmt, fmtCur } = usePreferences();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
   const savingsCats = useEffectiveCategoriesForType('savings');
@@ -335,9 +390,10 @@ export default function Transactions({ transactions, addTransaction, updateTrans
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [transactions, filterMonth, filterCategory, filterType, search]);
 
-  const totalIncome   = filtered.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-  const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
+  // Totals in the base currency
+  const totalIncome   = filtered.filter(t => t.type === 'income').reduce((s, t)  => s + t.baseAmount, 0);
+  const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.baseAmount, 0);
+  const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0);
 
   const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
 
@@ -452,7 +508,10 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                     </td>
                     <td><TypeBadge type={t.type} /></td>
                     <td className={`tx-amount ${t.type}`}>
-                      {typeSignMap[t.type] || ''}{fmt(t.amount)}
+                      {typeSignMap[t.type] || ''}{fmtCur(t.amount, t.currency)}
+                      {isTransfer && t.toCurrency !== t.currency
+                        ? <span className="fx-approx">→ {fmtCur(t.toAmount, t.toCurrency)}</span>
+                        : <BaseApprox amount={t.amount} currency={t.currency} />}
                     </td>
                     <td className="tx-actions">
                       {!isTransfer && (

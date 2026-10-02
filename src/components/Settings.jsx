@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import {
   User, Palette, Bell, Shield, Database, LogOut, Trash2,
   Eye, EyeOff, Download, Upload, Lock, Plus, X, Check,
-  ChevronRight, Sliders,
+  ChevronRight, Sliders, ArrowLeftRight, RefreshCw,
 } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 import { updateProfile, updateEmail, deleteUser } from 'firebase/auth';
@@ -155,7 +155,7 @@ function PreferencesSection() {
       </SettingsRow>
 
       {/* Currency */}
-      <SettingsRow label="Currency" hint="Symbol shown on all amounts (no conversion)">
+      <SettingsRow label="Base Currency" hint="Net worth, totals, budgets and charts are converted into this currency">
         <div className="currency-picker">
           <input
             type="text"
@@ -209,6 +209,78 @@ function PreferencesSection() {
           <span style={{ fontSize: 13, color: 'var(--text-3)' }}>of the month</span>
         </div>
       </SettingsRow>
+    </Section>
+  );
+}
+
+// ─── 2b. Exchange Rates ────────────────────────────────────────────────────
+
+function ExchangeRateRow({ code }) {
+  const { prefs, baseCurrency, liveRates, setFxOverride } = usePreferences();
+  const override = prefs.fxOverrides?.[`${baseCurrency}:${code}`];
+  const live     = liveRates[code];
+  const [value, setValue] = useState(override ? String(override) : '');
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    const v = parseFloat(value);
+    await setFxOverride(code, v > 0 ? v : null);
+    if (!(v > 0)) setValue('');
+    setSaved(true); setTimeout(() => setSaved(false), 1500);
+  };
+  const clear = async () => { setValue(''); await setFxOverride(code, null); };
+
+  return (
+    <SettingsRow
+      label={`1 ${baseCurrency} → ${code}`}
+      hint={live
+        ? `Live rate: ${live.toFixed(4)} ${code}${override ? ' · using your rate' : ''}`
+        : 'No live rate available. Enter your own.'}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <input type="number" min="0" step="any" className="fx-rate-input"
+          placeholder={live ? live.toFixed(4) : 'Rate'}
+          value={value} onChange={e => setValue(e.target.value)} />
+        <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={save}>
+          {saved ? <Check size={13} strokeWidth={2} /> : 'Save'}
+        </button>
+        {override && (
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={clear} title="Use live rate">
+            <X size={13} strokeWidth={1.6} />
+          </button>
+        )}
+      </div>
+    </SettingsRow>
+  );
+}
+
+function ExchangeRatesSection({ accounts, debts, assets }) {
+  const { baseCurrency, ratesDate, ratesLoading, ratesError, refreshRates } = usePreferences();
+  const inUse = [...new Set([...accounts, ...debts, ...assets].map(x => x.currency))]
+    .filter(c => c && c !== baseCurrency)
+    .sort();
+
+  return (
+    <Section icon={ArrowLeftRight} title="Exchange Rates">
+      <SettingsRow
+        label="Live rates"
+        hint={ratesError || (ratesDate ? `Updated daily · last rates from ${ratesDate}` : 'Not loaded yet')}>
+        <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={refreshRates} disabled={ratesLoading}>
+          <RefreshCw size={13} strokeWidth={1.6} /> {ratesLoading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </SettingsRow>
+      {inUse.length === 0 ? (
+        <p className="settings-row-hint" style={{ padding: '4px 0 8px' }}>
+          All your accounts are in {baseCurrency}. Rates appear here once you add an account in another currency.
+        </p>
+      ) : (
+        <>
+          <p className="settings-row-hint" style={{ padding: '4px 0 8px' }}>
+            Leave blank to use the live rate. Enter your own if the rate you actually get (e.g. via MoMo
+            or a remittance app) differs. New transactions save the rate of the day they're recorded.
+          </p>
+          {inUse.map(code => <ExchangeRateRow key={`${baseCurrency}:${code}`} code={code} />)}
+        </>
+      )}
     </Section>
   );
 }
@@ -469,13 +541,14 @@ function DataSection({ transactions, accounts }) {
 
   // ── Export CSV ─────────────────────────────────────────────────────────
   const exportCSV = () => {
-    const header = 'date,description,amount,type,category,account';
+    const header = 'date,description,amount,currency,type,category,account';
     const rows = transactions.map(t => {
       const acct = accounts.find(a => a.id === (t.accountId || t.fromAccountId));
       return [
         t.date,
         `"${(t.description || '').replace(/"/g, '""')}"`,
         t.amount,
+        t.currency || acct?.currency || '',
         t.type,
         t.category || '',
         acct?.name || '',
@@ -500,7 +573,7 @@ function DataSection({ transactions, accounts }) {
         <td>${t.description}</td>
         <td>${t.category || t.type}</td>
         <td>${t.type}</td>
-        <td style="text-align:right">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)}</td>
+        <td style="text-align:right">${t.type === 'income' ? '+' : '-'}${t.amount.toFixed(2)} ${t.currency || ''}</td>
       </tr>`).join('');
     const win = window.open('', '_blank');
     win.document.write(`
@@ -823,7 +896,7 @@ function AccountSection({ logout }) {
 
 // ─── Main Settings Page ────────────────────────────────────────────────────
 
-export default function Settings({ currentUser, logout, transactions, accounts, addTransaction }) {
+export default function Settings({ currentUser, logout, transactions, accounts, debts, assets, addTransaction }) {
   // Expose addTransaction for the import confirm callback
   window.__addTransaction = addTransaction;
 
@@ -835,6 +908,7 @@ export default function Settings({ currentUser, logout, transactions, accounts, 
       <div className="settings-layout">
         <ProfileSection currentUser={currentUser} />
         <PreferencesSection />
+        <ExchangeRatesSection accounts={accounts} debts={debts} assets={assets} />
         <ManageCategoriesSection />
         <NotificationsSection />
         <SecuritySection />

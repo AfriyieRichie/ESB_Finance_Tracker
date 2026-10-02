@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Bell, Settings as SettingsIcon, Lock, MoreVertical, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PreferencesProvider, usePreferences } from './contexts/PreferencesContext';
@@ -74,7 +74,7 @@ function PinLock({ pinHash, onUnlock }) {
 
 function AppContent() {
   const { currentUser, logout } = useAuth();
-  const { prefs, locked, setLocked } = usePreferences();
+  const { prefs, locked, setLocked, prefsLoading, baseCurrency, toBase } = usePreferences();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showNudge, setShowNudge] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -96,13 +96,63 @@ function AppContent() {
   }, [showMobileMenu]);
 
   const {
-    transactions, budgets, accounts, debts, assets, loading,
+    transactions: rawTransactions, budgets, accounts: rawAccounts, debts: rawDebts, assets: rawAssets, loading,
     addTransaction, updateTransaction, deleteTransaction, addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
-    addAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
   } = useFinanceData(currentUser?.uid);
+
+  // ── Multi-currency: tag everything with its currency and its value in the base currency ──
+  const { transactions, accounts, debts, assets, missingRates } = useMemo(() => {
+    const missing = new Set();
+    const conv = (amount, cur) => {
+      const v = toBase(amount || 0, cur);
+      if (v === null) { missing.add(cur); return 0; }
+      return v;
+    };
+    const accounts = rawAccounts.map(a => {
+      const currency = a.currency || baseCurrency;
+      return { ...a, currency, baseBalance: conv(a.balance, currency) };
+    });
+    const acctMap = Object.fromEntries(accounts.map(a => [a.id, a]));
+    const debts = rawDebts.map(d => {
+      const currency = d.currency || baseCurrency;
+      return { ...d, currency, baseBalance: conv(d.currentBalance, currency) };
+    });
+    const assets = rawAssets.map(a => {
+      const currency = a.currency || baseCurrency;
+      return { ...a, currency, baseValue: conv(a.currentValue, currency) };
+    });
+    const transactions = rawTransactions.map(t => {
+      const currency   = t.currency || acctMap[t.accountId]?.currency || baseCurrency;
+      // Use the rate saved when the transaction was recorded, so past reports don't drift
+      const baseAmount = t.baseCurrency === baseCurrency && typeof t.fxRate === 'number'
+        ? t.amount * t.fxRate
+        : conv(t.amount, currency);
+      const extra = t.type === 'transfer'
+        ? { toCurrency: t.toCurrency || acctMap[t.toAccountId]?.currency || currency, toAmount: t.toAmount ?? t.amount }
+        : {};
+      return { ...t, currency, baseAmount, ...extra };
+    });
+    return { transactions, accounts, debts, assets, missingRates: [...missing] };
+  }, [rawTransactions, rawAccounts, rawDebts, rawAssets, baseCurrency, toBase]);
+
+  // Records created before multi-currency have no currency; pin them to the current base
+  // so changing the base currency later doesn't silently reinterpret their amounts.
+  const stamped = useRef(new Set());
+  useEffect(() => {
+    if (loading || prefsLoading) return;
+    const stamp = (list, update) => list.forEach(x => {
+      if (x.currency || stamped.current.has(x.id)) return;
+      stamped.current.add(x.id);
+      update(x.id, { currency: baseCurrency });
+    });
+    stamp(rawAccounts, updateAccount);
+    stamp(rawDebts,    updateDebt);
+    stamp(rawAssets,   updateAsset);
+  }, [loading, prefsLoading, rawAccounts, rawDebts, rawAssets, baseCurrency, updateAccount, updateDebt, updateAsset]);
 
   // ── Daily nudge ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -245,7 +295,7 @@ function AppContent() {
           <>
             {activeTab === 'dashboard' && (
               <Dashboard transactions={transactions} budgets={budgets}
-                accounts={accounts} debts={debts} assets={assets} />
+                accounts={accounts} debts={debts} assets={assets} missingRates={missingRates} />
             )}
             {activeTab === 'budget' && (
               <Budget budgets={budgets} transactions={transactions}
@@ -261,7 +311,7 @@ function AppContent() {
             )}
             {activeTab === 'accounts' && (
               <Accounts
-                accounts={accounts} debts={debts} assets={assets}
+                accounts={accounts} debts={debts} assets={assets} missingRates={missingRates}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt}
                 addAsset={addAsset} updateAssetValue={updateAssetValue}
@@ -272,6 +322,7 @@ function AppContent() {
               <Settings
                 currentUser={currentUser} logout={logout}
                 transactions={transactions} accounts={accounts}
+                debts={debts} assets={assets}
                 addTransaction={addTransaction}
               />
             )}

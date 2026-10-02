@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react';
 import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
-import { useFmt } from '../contexts/PreferencesContext';
+import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
+import CurrencySelect, { BaseApprox } from './CurrencySelect';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -33,7 +34,9 @@ function ColorPicker({ value, onChange }) {
 // ─── Add / Edit Account Modal ──────────────────────────────────────────────
 
 function AccountModal({ existing, onSave, onClose }) {
+  const { baseCurrency } = usePreferences();
   const [name,    setName]    = useState(existing?.name    || '');
+  const [currency, setCurrency] = useState(existing?.currency || baseCurrency);
   const [type,    setType]    = useState(existing?.type    || 'bank');
   const [balance, setBalance] = useState(existing?.balance ?? '');
   const [phone,   setPhone]   = useState(existing?.phone   || '');
@@ -44,7 +47,9 @@ function AccountModal({ existing, onSave, onClose }) {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
-    await onSave({ name: name.trim(), type, balance: parseFloat(balance) || 0, phone, color, currency: 'GHS' });
+    const data = { name: name.trim(), type, phone, color, currency };
+    if (!existing) data.balance = parseFloat(balance) || 0;
+    await onSave(data);
     onClose();
   };
 
@@ -67,9 +72,16 @@ function AccountModal({ existing, onSave, onClose }) {
               {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
+          <div className="form-group">
+            <label>Currency</label>
+            <CurrencySelect value={currency} onChange={setCurrency} />
+            {existing && currency !== existing.currency && (
+              <p className="fx-hint">The balance number is kept as-is, not converted. Use Reconcile afterwards if it needs correcting.</p>
+            )}
+          </div>
           {!existing && (
             <div className="form-group">
-              <label>Current Balance (GH₵)</label>
+              <label>Current Balance ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={balance} onChange={e => setBalance(e.target.value)} />
             </div>
@@ -123,7 +135,7 @@ function ReconcileModal({ account, onSave, onClose }) {
             (e.g. you forgot to log a transaction).
           </p>
           <div className="form-group">
-            <label>Actual Balance (GH₵)</label>
+            <label>Actual Balance ({symbolFor(account.currency)})</label>
             <input type="number" step="0.01" value={newBalance}
               onChange={e => setNewBalance(e.target.value)} autoFocus required />
           </div>
@@ -140,7 +152,9 @@ function ReconcileModal({ account, onSave, onClose }) {
 // ─── Add / Edit Debt Modal ─────────────────────────────────────────────────
 
 function DebtModal({ existing, onSave, onClose }) {
+  const { baseCurrency } = usePreferences();
   const [name,     setName]     = useState(existing?.name           || '');
+  const [currency, setCurrency] = useState(existing?.currency       || baseCurrency);
   const [original, setOriginal] = useState(existing?.originalAmount || '');
   const [current,  setCurrent]  = useState(existing?.currentBalance || '');
   const [rate,     setRate]     = useState(existing?.interestRate   || '');
@@ -155,6 +169,7 @@ function DebtModal({ existing, onSave, onClose }) {
     setBusy(true);
     await onSave({
       name:           name.trim(),
+      currency,
       originalAmount: parseFloat(original) || parseFloat(current),
       currentBalance: parseFloat(current),
       interestRate:   parseFloat(rate)    || null,
@@ -178,14 +193,18 @@ function DebtModal({ existing, onSave, onClose }) {
             <input type="text" placeholder="e.g. Stanbic personal loan" value={name}
               onChange={e => setName(e.target.value)} autoFocus required />
           </div>
+          <div className="form-group">
+            <label>Currency</label>
+            <CurrencySelect value={currency} onChange={setCurrency} />
+          </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Original Amount (GH₵)</label>
+              <label>Original Amount ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={original} onChange={e => setOriginal(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Amount Still Owed (GH₵)</label>
+              <label>Amount Still Owed ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={current} onChange={e => setCurrent(e.target.value)} required />
             </div>
@@ -228,8 +247,9 @@ function DebtModal({ existing, onSave, onClose }) {
 // ─── Add Asset Modal ───────────────────────────────────────────────────────
 
 function AssetModal({ existing, accounts, onSave, onClose }) {
-  const fmt = useFmt();
+  const { fmtCur, convert, baseCurrency, txFxMeta } = usePreferences();
   const [name,       setName]       = useState(existing?.name         || '');
+  const [currency,   setCurrency]   = useState(existing?.currency     || baseCurrency);
   const [assetType,  setAssetType]  = useState(existing?.assetType    || 'tbill');
   const [costBasis,  setCostBasis]  = useState(existing?.costBasis    || '');
   const [currValue,  setCurrValue]  = useState(existing?.currentValue || '');
@@ -237,19 +257,28 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
   const [sourceAcct, setSourceAcct] = useState('');
   const [busy,       setBusy]       = useState(false);
 
+  const source     = accounts.find(a => a.id === sourceAcct);
+  const crossCur   = source && source.currency !== currency;
+  // Cost in the funding account's currency (what actually leaves that account)
+  const sourceCost = source && costBasis ? convert(parseFloat(costBasis), currency, source.currency) : null;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !costBasis) return;
+    if (crossCur && sourceCost === null) return;
     setBusy(true);
     await onSave(
       {
         name:         name.trim(),
         assetType,
+        currency,
         costBasis:    parseFloat(costBasis),
         currentValue: parseFloat(currValue) || parseFloat(costBasis),
         maturityDate: maturity || null,
       },
-      sourceAcct || null
+      sourceAcct || null,
+      source ? Math.round(sourceCost * 100) / 100 : undefined,
+      source ? txFxMeta(source.currency) : {}
     );
     onClose();
   };
@@ -275,14 +304,18 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
               {ASSET_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
+          <div className="form-group">
+            <label>Currency</label>
+            <CurrencySelect value={currency} onChange={setCurrency} />
+          </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Amount Invested / Cost (GH₵)</label>
+              <label>Amount Invested / Cost ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={costBasis} onChange={e => setCostBasis(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Current Value (GH₵)</label>
+              <label>Current Value ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="Same as invested"
                 value={currValue} onChange={e => setCurrValue(e.target.value)} />
             </div>
@@ -297,14 +330,21 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
               <select value={sourceAcct} onChange={e => setSourceAcct(e.target.value)}>
                 <option value="">— Select account —</option>
                 {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                  <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
                 ))}
               </select>
+              {crossCur && costBasis && (
+                <p className="fx-hint">
+                  {sourceCost === null
+                    ? `No ${source.currency}/${currency} rate available. Set one in Settings → Exchange Rates.`
+                    : `≈ ${fmtCur(sourceCost, source.currency)} will be deducted from ${source.name}.`}
+                </p>
+              )}
             </div>
           )}
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={busy}>
+            <button type="submit" className="btn-primary" disabled={busy || (crossCur && sourceCost === null)}>
               {existing ? 'Save Changes' : 'Add Asset'}
             </button>
           </div>
@@ -317,7 +357,8 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
 // ─── Update Asset Value Modal ──────────────────────────────────────────────
 
 function UpdateValueModal({ asset, onSave, onClose }) {
-  const fmt = useFmt();
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, asset.currency);
   const [value, setValue] = useState(asset.currentValue ?? '');
   const [busy,  setBusy]  = useState(false);
 
@@ -342,7 +383,7 @@ function UpdateValueModal({ asset, onSave, onClose }) {
             Cost basis: <strong style={{ color: 'var(--text-1)' }}>{fmt(asset.costBasis)}</strong>
           </p>
           <div className="form-group">
-            <label>Current Market Value (GH₵)</label>
+            <label>Current Market Value ({symbolFor(asset.currency)})</label>
             <input type="number" min="0" step="0.01" value={value}
               onChange={e => setValue(e.target.value)} autoFocus required />
           </div>
@@ -364,16 +405,23 @@ function UpdateValueModal({ asset, onSave, onClose }) {
 // ─── Cash Out Modal ────────────────────────────────────────────────────────
 
 function CashOutModal({ asset, accounts, onCashOut, onClose }) {
-  const fmt = useFmt();
-  const [amount,   setAmount]   = useState(asset.currentValue ?? '');
+  const { fmtCur, convert, txFxMeta } = usePreferences();
+  // Suggested payout in the receiving account's currency
+  const suggest = (acctId) => {
+    const acct = accounts.find(a => a.id === acctId);
+    const v    = acct ? convert(asset.currentValue || 0, asset.currency, acct.currency) : asset.currentValue;
+    return v === null || v === undefined ? '' : String(Math.round(v * 100) / 100);
+  };
   const [toAcct,   setToAcct]   = useState(accounts[0]?.id || '');
+  const [amount,   setAmount]   = useState(() => suggest(accounts[0]?.id));
   const [busy,     setBusy]     = useState(false);
+  const target = accounts.find(a => a.id === toAcct);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!toAcct || !amount) return;
     setBusy(true);
-    await onCashOut(asset.id, parseFloat(amount), toAcct);
+    await onCashOut(asset.id, parseFloat(amount), toAcct, txFxMeta(target?.currency));
     onClose();
   };
 
@@ -387,20 +435,21 @@ function CashOutModal({ asset, accounts, onCashOut, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
             This will close the asset and credit the received amount to your chosen account.
+            Current value: <strong>{fmtCur(asset.currentValue, asset.currency)}</strong>.
           </p>
           <div className="form-group">
-            <label>Amount Received (GH₵)</label>
-            <input type="number" min="0" step="0.01" value={amount}
-              onChange={e => setAmount(e.target.value)} autoFocus required />
-          </div>
-          <div className="form-group">
             <label>Credit to Account</label>
-            <select value={toAcct} onChange={e => setToAcct(e.target.value)} required>
+            <select value={toAcct} onChange={e => { setToAcct(e.target.value); setAmount(suggest(e.target.value)); }} required>
               <option value="">— Select account —</option>
               {accounts.map(a => (
-                <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
               ))}
             </select>
+          </div>
+          <div className="form-group">
+            <label>Amount Received ({symbolFor(target?.currency || asset.currency)})</label>
+            <input type="number" min="0" step="0.01" value={amount}
+              onChange={e => setAmount(e.target.value)} autoFocus required />
           </div>
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
@@ -415,7 +464,7 @@ function CashOutModal({ asset, accounts, onCashOut, onClose }) {
 // ─── Account Card ──────────────────────────────────────────────────────────
 
 function AccountCard({ account, onEdit, onDelete, onReconcile }) {
-  const fmt = useFmt();
+  const { fmtCur } = usePreferences();
   const Icon = ACCOUNT_TYPE_ICONS[account.type] || ACCOUNT_TYPE_ICONS.other;
   const meta = getAccountTypeMeta(account.type);
 
@@ -427,13 +476,16 @@ function AccountCard({ account, onEdit, onDelete, onReconcile }) {
         </span>
         <div>
           <p className="acct-name">{account.name}</p>
-          <p className="acct-type">{meta.label}{account.phone ? ` · ${account.phone}` : ''}</p>
+          <p className="acct-type">{meta.label} · {account.currency}{account.phone ? ` · ${account.phone}` : ''}</p>
         </div>
       </div>
       <div className="acct-card-right">
-        <p className="acct-balance" style={{ color: account.balance >= 0 ? 'var(--text-1)' : 'var(--danger)' }}>
-          {fmt(account.balance)}
-        </p>
+        <div className="acct-balance-wrap">
+          <p className="acct-balance" style={{ color: account.balance >= 0 ? 'var(--text-1)' : 'var(--danger)' }}>
+            {fmtCur(account.balance, account.currency)}
+          </p>
+          <BaseApprox amount={account.balance} currency={account.currency} />
+        </div>
         <div className="acct-actions">
           <button className="icon-btn" onClick={() => onReconcile(account)} title="Reconcile balance"><RefreshCw size={13} strokeWidth={1.6} /></button>
           <button className="icon-btn" onClick={() => onEdit(account)} title="Edit"><Pencil size={13} strokeWidth={1.6} /></button>
@@ -447,7 +499,8 @@ function AccountCard({ account, onEdit, onDelete, onReconcile }) {
 // ─── Debt Card ─────────────────────────────────────────────────────────────
 
 function DebtCard({ debt, onEdit, onDelete }) {
-  const fmt = useFmt();
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, debt.currency);
   const original = debt.originalAmount || debt.currentBalance;
   const paid     = Math.max(0, original - debt.currentBalance);
   const pct      = original > 0 ? Math.min((paid / original) * 100, 100) : 0;
@@ -470,7 +523,10 @@ function DebtCard({ debt, onEdit, onDelete }) {
         </div>
         <div className="debt-amounts">
           <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{pct.toFixed(0)}% paid off</span>
-          <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{fmt(debt.currentBalance)} remaining</span>
+          <span style={{ color: 'var(--danger)', fontWeight: 600, textAlign: 'right' }}>
+            {fmt(debt.currentBalance)} remaining
+            <BaseApprox amount={debt.currentBalance} currency={debt.currency} />
+          </span>
         </div>
       </div>
       {debt.monthlyPayment && (
@@ -482,8 +538,9 @@ function DebtCard({ debt, onEdit, onDelete }) {
 
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
-function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
-  const fmt = useFmt();
+function AssetCard({ asset, onUpdateValue, onCashOut, onDelete }) {
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, asset.currency);
   const Icon = ASSET_TYPE_ICONS[asset.assetType] || ASSET_TYPE_ICONS.other;
   const meta = getAssetTypeMeta(asset.assetType);
   const gain = asset.currentValue - asset.costBasis;
@@ -511,7 +568,10 @@ function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
         </div>
         <div className="asset-val-row">
           <span className="asset-val-label">Current Value</span>
-          <span className="asset-val" style={{ color: 'var(--text-1)', fontWeight: 700 }}>{fmt(asset.currentValue)}</span>
+          <span className="asset-val" style={{ color: 'var(--text-1)', fontWeight: 700, textAlign: 'right' }}>
+            {fmt(asset.currentValue)}
+            <BaseApprox amount={asset.currentValue} currency={asset.currency} />
+          </span>
         </div>
         <div className="asset-val-row">
           <span className="asset-val-label">Gain / Loss</span>
@@ -536,31 +596,52 @@ function AssetCard({ asset, accounts, onUpdateValue, onCashOut, onDelete }) {
 // ─── Transfer Modal ────────────────────────────────────────────────────────
 
 function TransferModal({ accounts, onTransfer, onClose }) {
-  const fmt = useFmt();
+  const { fmtCur, convert, txFxMeta } = usePreferences();
   const today = new Date().toISOString().slice(0, 10);
   const [fromId, setFromId] = useState('');
   const [toId,   setToId]   = useState('');
   const [amount, setAmount] = useState('');
+  const [received, setReceived] = useState('');   // only used for cross-currency transfers
+  const [receivedTouched, setReceivedTouched] = useState(false);
   const [desc,   setDesc]   = useState('');
   const [date,   setDate]   = useState(today);
   const [error,  setError]  = useState('');
   const [busy,   setBusy]   = useState(false);
 
   const fromAcct = accounts.find(a => a.id === fromId);
+  const toAcct   = accounts.find(a => a.id === toId);
+  const crossCur = fromAcct && toAcct && fromAcct.currency !== toAcct.currency;
+
+  // Pre-fill the received amount from today's rate until the user types their own
+  const suggestReceived = (amt, from, to) => {
+    if (!from || !to || from.currency === to.currency || !amt) return '';
+    const v = convert(parseFloat(amt), from.currency, to.currency);
+    return v === null ? '' : String(Math.round(v * 100) / 100);
+  };
+  const refresh = (amt, fId, tId) => {
+    if (receivedTouched) return;
+    setReceived(suggestReceived(amt, accounts.find(a => a.id === fId), accounts.find(a => a.id === tId)));
+  };
+
+  const sent = parseFloat(amount), got = parseFloat(received);
+  const impliedRate = crossCur && sent > 0 && got > 0 ? got / sent : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!fromId || !toId || fromId === toId || !amount) return;
-    if (fromAcct && parseFloat(amount) > fromAcct.balance) {
-      setError(`Insufficient balance. ${fromAcct.name} only has ${fmt(fromAcct.balance)}.`);
+    if (crossCur && !(got > 0)) { setError(`Enter how much arrived in ${toAcct.name}.`); return; }
+    if (fromAcct && sent > fromAcct.balance) {
+      setError(`Insufficient balance. ${fromAcct.name} only has ${fmtCur(fromAcct.balance, fromAcct.currency)}.`);
       return;
     }
     setBusy(true);
     try {
       await onTransfer({
+        ...txFxMeta(fromAcct.currency),
         fromAccountId: fromId,
         toAccountId:   toId,
-        amount:        parseFloat(amount),
+        amount:        sent,
+        ...(crossCur ? { toAmount: got, toCurrency: toAcct.currency } : {}),
         description:   desc.trim() || 'Transfer',
         date,
       });
@@ -581,33 +662,55 @@ function TransferModal({ accounts, onTransfer, onClose }) {
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-group">
             <label>From Account</label>
-            <select value={fromId} onChange={e => { setFromId(e.target.value); setError(''); }} required>
+            <select value={fromId} onChange={e => { setFromId(e.target.value); setError(''); refresh(amount, e.target.value, toId); }} required>
               <option value="">— Select account —</option>
               {accounts.map(a => (
-                <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
               ))}
             </select>
           </div>
           <div className="form-group">
             <label>To Account</label>
-            <select value={toId} onChange={e => { setToId(e.target.value); setError(''); }} required>
+            <select value={toId} onChange={e => { setToId(e.target.value); setError(''); refresh(amount, fromId, e.target.value); }} required>
               <option value="">— Select account —</option>
               {accounts.filter(a => a.id !== fromId).map(a => (
-                <option key={a.id} value={a.id}>{a.name} ({fmt(a.balance)})</option>
+                <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
               ))}
             </select>
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Amount (GH₵)</label>
+              <label>{crossCur ? 'Amount Sent' : 'Amount'} ({symbolFor(fromAcct?.currency)})</label>
               <input type="number" min="0.01" step="0.01" placeholder="0.00"
-                value={amount} onChange={e => { setAmount(e.target.value); setError(''); }} required />
+                value={amount} onChange={e => { setAmount(e.target.value); setError(''); refresh(e.target.value, fromId, toId); }} required />
             </div>
-            <div className="form-group">
-              <label>Date</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
-            </div>
+            {crossCur ? (
+              <div className="form-group">
+                <label>Amount Received ({symbolFor(toAcct.currency)})</label>
+                <input type="number" min="0.01" step="0.01" placeholder="0.00"
+                  value={received} onChange={e => { setReceived(e.target.value); setReceivedTouched(true); setError(''); }} required />
+              </div>
+            ) : (
+              <div className="form-group">
+                <label>Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+              </div>
+            )}
           </div>
+          {crossCur && (
+            <>
+              <p className="fx-hint">
+                {impliedRate
+                  ? `Rate you got: 1 ${fromAcct.currency} = ${impliedRate.toFixed(4)} ${toAcct.currency}. `
+                  : ''}
+                Pre-filled from today's rate. Change it to exactly what arrived, fees included.
+              </p>
+              <div className="form-group">
+                <label>Date</label>
+                <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+              </div>
+            </>
+          )}
           <div className="form-group">
             <label>Description (optional)</label>
             <input type="text" placeholder="e.g. Moving savings to MoMo"
@@ -629,16 +732,21 @@ function TransferModal({ accounts, onTransfer, onClose }) {
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
-  const fmt = useFmt();
+export default function Accounts({ accounts, debts, assets, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+  const { fmt, fmtCur, baseCurrency } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
 
-  // ── Net worth calculation ──────────────────────────────────────────────
-  const totalCash        = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-  const totalDebts       = debts.filter(d => d.status !== 'paid').reduce((s, d) => s + (d.currentBalance || 0), 0);
-  const totalInvestments = assets.filter(a => a.status === 'active').reduce((s, a) => s + (a.currentValue || 0), 0);
+  // ── Net worth calculation (everything converted to the base currency) ──
+  const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
+  const totalDebts       = debts.filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
+  const totalInvestments = assets.filter(a => a.status === 'active').reduce((s, a) => s + (a.baseValue || 0), 0);
   const netWorth         = totalCash + totalInvestments - totalDebts;
+
+  // Cash held per currency, base currency first
+  const cashByCurrency = Object.entries(
+    accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
+  ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
 
   const activeAssets = assets.filter(a => a.status === 'active');
 
@@ -681,7 +789,24 @@ export default function Accounts({ accounts, debts, assets, addAccount, updateAc
             <span className="nw-item-val" style={{ color: 'var(--danger)' }}>-{fmt(totalDebts)}</span>
           </div>
         </div>
+        {cashByCurrency.length > 1 && (
+          <div className="fx-breakdown">
+            {cashByCurrency.map(([cur, amt]) => (
+              <span key={cur} className="fx-chip">
+                {fmtCur(amt, cur)}
+                <BaseApprox amount={amt} currency={cur} />
+              </span>
+            ))}
+          </div>
+        )}
       </div>
+
+      {missingRates.length > 0 && (
+        <p className="fx-warning">
+          No exchange rate available for {missingRates.join(', ')}. Those amounts are left out of the totals.
+          Set a rate in Settings → Exchange Rates.
+        </p>
+      )}
 
       {/* ── Cash Accounts ── */}
       <div className="accounts-section">
@@ -748,7 +873,6 @@ export default function Accounts({ accounts, debts, assets, addAccount, updateAc
               <AssetCard
                 key={a.id}
                 asset={a}
-                accounts={accounts}
                 onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
                 onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
                 onDelete={deleteAsset}

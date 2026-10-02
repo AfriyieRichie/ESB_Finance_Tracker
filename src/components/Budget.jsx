@@ -4,7 +4,7 @@ import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
   getCategoriesForType,
 } from '../hooks/useFinanceData';
-import { useFmt, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
+import { useFmt, usePreferences, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
@@ -20,6 +20,7 @@ function BudgetModal({ month, existing, onSave, onClose }) {
     existing?.category || getCategoriesForType(existing?.type || 'expense')[0]?.name || ''
   );
   const [amount, setAmount] = useState(existing?.amount || '');
+  const { currencySymbol } = usePreferences();
 
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
@@ -66,7 +67,7 @@ function BudgetModal({ month, existing, onSave, onClose }) {
             <CategorySelect categories={cats} value={category} onChange={setCategory} disabled={!!existing} />
           </div>
           <div className="form-group">
-            <label>Monthly Budget (GH₵)</label>
+            <label>Monthly Budget ({currencySymbol})</label>
             <input type="number" min="1" step="1" placeholder="0"
               value={amount} onChange={e => setAmount(e.target.value)} autoFocus />
           </div>
@@ -107,7 +108,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
       .filter(t => t.date.startsWith(monthStr))
       .forEach(t => {
         const key = `${t.type}:${t.category}`;
-        result[key] = (result[key] || 0) + t.amount;
+        result[key] = (result[key] || 0) + t.baseAmount;   // budgets are in the base currency
       });
     return result;
   }, [transactions, monthStr]);

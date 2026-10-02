@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell,
   BarChart, Bar,
 } from 'recharts';
-import { useFmt, usePreferences } from '../contexts/PreferencesContext';
+import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 
 const TOOLTIP_STYLE = {
@@ -50,9 +50,9 @@ const PieTooltip = ({ active, payload, fmt }) => {
   );
 };
 
-export default function Dashboard({ transactions, budgets, accounts, debts, assets }) {
-  const fmt = useFmt();
-  const { prefs } = usePreferences();
+// All totals here use base-currency values (baseAmount / baseBalance / baseValue) computed in App
+export default function Dashboard({ transactions, budgets, accounts, debts, assets, missingRates = [] }) {
+  const { prefs, fmt, fmtCur, baseCurrency, rateFor, ratesDate } = usePreferences();
   const hidden = prefs.hideBalances;
   const mask   = '••••••';
 
@@ -60,17 +60,23 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   // ── Account-derived balances (ground truth) ────────────────────────────
-  const totalCash        = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-  const totalInvestments = (assets  || []).filter(a => a.status === 'active').reduce((s, a) => s + (a.currentValue || 0), 0);
-  const totalDebts       = (debts   || []).filter(d => d.status !== 'paid').reduce((s, d) => s + (d.currentBalance || 0), 0);
+  const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
+  const totalInvestments = (assets  || []).filter(a => a.status === 'active').reduce((s, a) => s + (a.baseValue || 0), 0);
+  const totalDebts       = (debts   || []).filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
   const netWorth         = totalCash + totalInvestments - totalDebts;
+
+  // Cash per currency (base first) for the multi-currency breakdown
+  const cashByCurrency = Object.entries(
+    accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
+  ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
+  const foreignCurrencies = cashByCurrency.map(([c]) => c).filter(c => c !== baseCurrency);
 
   // ── Current-month stats ────────────────────────────────────────────────
   const stats = useMemo(() => {
     const txs      = transactions.filter(t => t.date.startsWith(currentMonth));
-    const income   = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-    const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const saved    = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0);
+    const income   = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.baseAmount, 0);
+    const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.baseAmount, 0);
+    const saved    = txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0);
     const expensePct = income > 0 ? Math.round((expenses / income) * 100) : null;
     const savedPct   = income > 0 ? Math.round((saved   / income) * 100) : null;
     return { income, expenses, saved, expensePct, savedPct };
@@ -81,7 +87,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
     const acc = {};
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'expense')
-      .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.amount; });
+      .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
     return Object.entries(acc)
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
@@ -92,7 +98,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
     const acc = {};
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'savings')
-      .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.amount; });
+      .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
     return Object.entries(acc)
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
@@ -106,9 +112,9 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
       const txs = transactions.filter(t => t.date.startsWith(m));
       return {
         month:    d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        Income:   txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0),
-        Expenses: txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
-        Savings:  txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.amount, 0),
+        Income:   txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.baseAmount, 0),
+        Expenses: txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.baseAmount, 0),
+        Savings:  txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0),
       };
     });
   }, [transactions]);
@@ -119,7 +125,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
       const txType = b.type || 'expense';
       const spent = transactions
         .filter(t => t.date.startsWith(currentMonth) && t.type === txType && t.category === b.category)
-        .reduce((s, t) => s + t.amount, 0);
+        .reduce((s, t) => s + t.baseAmount, 0);
       // Short label: first word only, max 8 chars
       const label = b.category.split(' & ')[0].split(' ')[0].slice(0, 8);
       return { name: label, budget: b.amount, spent };
@@ -155,6 +161,13 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
         </span>
       </div>
 
+      {missingRates.length > 0 && (
+        <p className="fx-warning">
+          No exchange rate available for {missingRates.join(', ')}. Those amounts are left out of the totals.
+          Set a rate in Settings → Exchange Rates.
+        </p>
+      )}
+
       {/* ── Stat Cards ── */}
       <div className="stats-grid">
         {statCards.map(card => (
@@ -165,6 +178,21 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <div className={`stat-net-worth ${card.nwCls}`}>
                 <span className="stat-nw-label">Net Worth</span>
                 <span className="stat-nw-value">{card.netWorth}</span>
+              </div>
+            )}
+            {card.netWorth !== undefined && foreignCurrencies.length > 0 && (
+              <div className="fx-breakdown fx-breakdown--card">
+                {cashByCurrency.map(([cur, amt]) => (
+                  <span key={cur} className="fx-chip">{hidden ? mask : fmtCur(amt, cur)}</span>
+                ))}
+                {foreignCurrencies.map(cur => rateFor(cur) && (
+                  <span key={`r-${cur}`} className="fx-rate">
+                    {rateFor(cur) >= 1
+                      ? `1 ${baseCurrency} = ${rateFor(cur).toFixed(2)} ${cur}`
+                      : `1 ${cur} = ${(1 / rateFor(cur)).toFixed(2)} ${baseCurrency}`}
+                    {ratesDate ? ` · ${ratesDate}` : ''}
+                  </span>
+                ))}
               </div>
             )}
             <div className="stat-footer">
@@ -321,7 +349,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
                   </span>
                 </div>
                 <span className={`recent-amount ${t.type}`}>
-                  {t.type === 'income' ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmt(t.amount)}
+                  {t.type === 'income' ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmtCur(t.amount, t.currency)}
                 </span>
               </div>
             );
