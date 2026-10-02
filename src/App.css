@@ -1434,7 +1434,9 @@
 
 /* ── Tablet / large phone ──────────────────────────────── */
 @media (max-width: 768px) {
-  .app-header { padding: 0 16px; height: 56px; }
+  /* No backdrop-filter here: it makes the header the containing block for position:fixed
+     children, which pinned the bottom nav to the header and hid the header's ⋮ menu. */
+  .app-header { padding: 0 16px; height: 56px; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .app-main   { padding: 16px 14px calc(80px + env(safe-area-inset-bottom)); }
 
   /* ── Bottom navigation bar ── */
