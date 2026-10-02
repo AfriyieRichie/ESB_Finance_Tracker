@@ -2119,7 +2119,20 @@ img.logo-on-light { display: none; }
 .activity-presets .btn-ghost { font-size: 12.5px; padding: 5px 12px; }
 .activity-range { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .activity-range label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
-.activity-range input, .activity-range select { width: 100%; }
+.activity-range input,
+.activity-range select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  color: var(--text-1);
+  font: inherit; font-size: 13.5px; text-transform: none; letter-spacing: normal; font-weight: 500;
+  outline: none;
+  transition: var(--transition);
+}
+.activity-range input:focus,
+.activity-range select:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(0,230,118,0.12); }
 .activity-summary {
   display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
   font-size: 13px; color: var(--text-2);

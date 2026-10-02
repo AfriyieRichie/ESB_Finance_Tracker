@@ -5,6 +5,8 @@
 }
 
 :root {
+  color-scheme: dark;        /* native dropdown lists, date pickers and scrollbars render dark */
+
   /* ── Backgrounds (near-black — barely any tint) ── */
   --bg-base:      #080a09;   /* near-black base              */
   --bg-primary:   #0b0e0d;   /* primary surface              */
@@ -51,6 +53,7 @@
 
 /* ─── Light theme ──────────────────────────────────────────────────────── */
 [data-theme="light"] {
+  color-scheme: light;
   --bg-base:      #f0f5f2;
   --bg-primary:   #e8f0eb;
   --bg-card:      #ffffff;
