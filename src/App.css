@@ -2109,3 +2109,39 @@ img.logo-on-light { display: none; }
 @media (max-width: 768px) {
   .brand-wordmark { height: 30px; }
 }
+
+/* ─── Account activity window ─────────────────────────── */
+.acct-card--clickable { cursor: pointer; }
+.acct-card--clickable:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.modal.modal-wide { max-width: 640px; max-height: 88vh; display: flex; flex-direction: column; }
+.activity-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.activity-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.activity-presets .btn-ghost { font-size: 12.5px; padding: 5px 12px; }
+.activity-range { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.activity-range label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+.activity-range input, .activity-range select { width: 100%; }
+.activity-summary {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+  font-size: 13px; color: var(--text-2);
+  background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: 10px 14px; margin-bottom: 10px;
+}
+.activity-summary .pos, .activity-amt.pos { color: var(--success); }
+.activity-summary .neg, .activity-amt.neg { color: var(--danger); }
+.activity-list { overflow-y: auto; min-height: 120px; }
+.activity-row {
+  display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center;
+  padding: 11px 4px; border-bottom: 1px solid var(--border);
+}
+.activity-row:last-child { border-bottom: none; }
+.activity-date { font-size: 12.5px; color: var(--text-2); }
+.activity-desc { display: flex; flex-direction: column; min-width: 0; }
+.activity-desc span { font-size: 14px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-desc small { font-size: 12px; color: var(--text-3); }
+.activity-amt { font-size: 14px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 600px) {
+  .activity-range { grid-template-columns: 1fr 1fr; }
+  .activity-range label:last-child { grid-column: span 2; }
+  .activity-row { grid-template-columns: 1fr auto; }
+  .activity-date { grid-column: span 2; font-size: 11.5px; }
+}

@@ -374,6 +374,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
   const [filterMonth, setFilterMonth]       = useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterType, setFilterType]         = useState('All');
+  const [filterAccount, setFilterAccount]   = useState('All');
   const [search, setSearch]                 = useState('');
 
   const acctMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a])), [accounts]);
@@ -384,11 +385,13 @@ export default function Transactions({ transactions, addTransaction, updateTrans
         if (filterMonth && !t.date.startsWith(filterMonth)) return false;
         if (filterCategory !== 'All' && t.category !== filterCategory) return false;
         if (filterType !== 'All' && t.type !== filterType) return false;
+        // Transfers belong to both the sending and the receiving account
+        if (filterAccount !== 'All' && t.accountId !== filterAccount && t.toAccountId !== filterAccount) return false;
         if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [transactions, filterMonth, filterCategory, filterType, search]);
+  }, [transactions, filterMonth, filterCategory, filterType, filterAccount, search]);
 
   // Totals in the base currency
   const totalIncome   = filtered.filter(t => t.type === 'income').reduce((s, t)  => s + t.baseAmount, 0);
@@ -397,7 +400,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
 
   const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
 
-  const isFiltered = filterCategory !== 'All' || filterType !== 'All' || search;
+  const isFiltered = filterCategory !== 'All' || filterType !== 'All' || filterAccount !== 'All' || search;
 
   // Categories shown in dropdown depend on selected type
   const dropdownCategories = filterType === 'All' ? allEffectiveCats
@@ -446,8 +449,12 @@ export default function Transactions({ transactions, addTransaction, updateTrans
           <option value="savings">◆ Savings</option>
           <option value="transfer">⇄ Transfer</option>
         </select>
+        <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)}>
+          <option value="All">All Accounts</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
         {isFiltered && (
-          <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setSearch(''); }}>
+          <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setFilterAccount('All'); setSearch(''); }}>
             Clear filters
           </button>
         )}

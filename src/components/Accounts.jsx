@@ -461,15 +461,118 @@ function CashOutModal({ asset, accounts, onCashOut, onClose }) {
   );
 }
 
+// ─── Account Activity Modal ────────────────────────────────────────────────
+
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function AccountActivityModal({ account, accounts, transactions, onClose }) {
+  const { fmtCur } = usePreferences();
+  const [from, setFrom] = useState('');      // '' = no limit
+  const [to,   setTo]   = useState('');
+  const [sort, setSort] = useState('newest');
+  const acctName = (id) => accounts.find(a => a.id === id)?.name || 'deleted account';
+
+  // Each transaction as it affected THIS account: signed amount in the account's currency
+  const rows = transactions
+    .filter(t => t.accountId === account.id || t.toAccountId === account.id)
+    .filter(t => (!from || t.date >= from) && (!to || t.date <= to))
+    .map(t => {
+      if (t.type === 'transfer') {
+        const incoming = t.toAccountId === account.id;
+        return {
+          ...t,
+          signed: incoming ? (t.toAmount ?? t.amount) : -t.amount,
+          detail: incoming ? `Transfer from ${acctName(t.fromAccountId)}` : `Transfer to ${acctName(t.toAccountId)}`,
+        };
+      }
+      return { ...t, signed: t.type === 'income' ? t.amount : -t.amount, detail: t.category };
+    })
+    .sort((a, b) => sort === 'newest' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+
+  const moneyIn  = rows.filter(r => r.signed > 0).reduce((s, r) => s + r.signed, 0);
+  const moneyOut = rows.filter(r => r.signed < 0).reduce((s, r) => s - r.signed, 0);
+  const fmt = (v) => fmtCur(v, account.currency);
+
+  const preset = (kind) => {
+    const now = new Date();
+    if (kind === 'month')  { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), 1))); setTo(''); }
+    if (kind === '30')     { setFrom(isoDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))); setTo(''); }
+    if (kind === 'all')    { setFrom(''); setTo(''); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3>{account.name}</h3>
+            <p className="acct-type" style={{ marginTop: 2 }}>
+              Balance: <strong style={{ color: 'var(--text-1)' }}>{fmt(account.balance)}</strong> · {account.currency}
+            </p>
+          </div>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="activity-filters">
+          <div className="activity-presets">
+            <button type="button" className="btn-ghost" onClick={() => preset('month')}>This month</button>
+            <button type="button" className="btn-ghost" onClick={() => preset('30')}>Last 30 days</button>
+            <button type="button" className="btn-ghost" onClick={() => preset('all')}>All time</button>
+          </div>
+          <div className="activity-range">
+            <label>From<input type="date" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} /></label>
+            <label>To<input type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} /></label>
+            <label>Sort
+              <select value={sort} onChange={e => setSort(e.target.value)}>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="activity-summary">
+          <span>{rows.length} transaction{rows.length !== 1 ? 's' : ''}</span>
+          <span className="pos">In {fmt(moneyIn)}</span>
+          <span className="neg">Out {fmt(moneyOut)}</span>
+          <span>Net <strong>{fmt(moneyIn - moneyOut)}</strong></span>
+        </div>
+
+        <div className="activity-list">
+          {rows.length === 0 ? (
+            <p className="accounts-empty" style={{ textAlign: 'center' }}>No transactions in this period.</p>
+          ) : rows.map(r => (
+            <div key={r.id} className="activity-row">
+              <span className="activity-date">
+                {new Date(r.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <div className="activity-desc">
+                <span>{r.description}</span>
+                <small>{r.detail}</small>
+              </div>
+              <span className={`activity-amt ${r.signed >= 0 ? 'pos' : 'neg'}`}>
+                {r.signed >= 0 ? '+' : '-'}{fmt(Math.abs(r.signed))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Account Card ──────────────────────────────────────────────────────────
 
-function AccountCard({ account, onEdit, onDelete, onReconcile }) {
+function AccountCard({ account, onEdit, onDelete, onReconcile, onOpen }) {
   const { fmtCur } = usePreferences();
   const Icon = ACCOUNT_TYPE_ICONS[account.type] || ACCOUNT_TYPE_ICONS.other;
   const meta = getAccountTypeMeta(account.type);
 
   return (
-    <div className="acct-card">
+    <div className="acct-card acct-card--clickable" role="button" tabIndex={0}
+      title="View transactions"
+      onClick={() => onOpen(account)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(account); } }}>
       <div className="acct-card-left">
         <span className="acct-icon" style={{ background: `${account.color}22`, border: `1px solid ${account.color}44` }}>
           <Icon size={18} strokeWidth={1.5} color="#c8ddd5" />
@@ -486,7 +589,8 @@ function AccountCard({ account, onEdit, onDelete, onReconcile }) {
           </p>
           <BaseApprox amount={account.balance} currency={account.currency} />
         </div>
-        <div className="acct-actions">
+        {/* Buttons keep their own actions instead of opening the activity window */}
+        <div className="acct-actions" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
           <button className="icon-btn" onClick={() => onReconcile(account)} title="Reconcile balance"><RefreshCw size={13} strokeWidth={1.6} /></button>
           <button className="icon-btn" onClick={() => onEdit(account)} title="Edit"><Pencil size={13} strokeWidth={1.6} /></button>
           <button className="icon-btn delete-btn" onClick={() => onDelete(account.id)} title="Delete"><Trash2 size={13} strokeWidth={1.6} /></button>
@@ -732,7 +836,7 @@ function TransferModal({ accounts, onTransfer, onClose }) {
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -827,6 +931,7 @@ export default function Accounts({ accounts, debts, assets, missingRates = [], a
                 onEdit={acct => setModal({ type: 'account', data: acct })}
                 onDelete={deleteAccount}
                 onReconcile={acct => setModal({ type: 'reconcile', data: acct })}
+                onOpen={acct => setModal({ type: 'activity', data: acct })}
               />
             ))}
           </div>
@@ -890,6 +995,13 @@ export default function Accounts({ accounts, debts, assets, missingRates = [], a
             ? (updates) => updateAccount(modal.data.id, updates)
             : addAccount}
           onClose={close}
+        />
+      )}
+      {modal?.type === 'activity' && (
+        <AccountActivityModal
+          // Look up the live account so the balance updates if it changes while open
+          account={accounts.find(a => a.id === modal.data.id) || modal.data}
+          accounts={accounts} transactions={transactions} onClose={close}
         />
       )}
       {modal?.type === 'reconcile' && (

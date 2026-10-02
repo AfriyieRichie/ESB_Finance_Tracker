@@ -373,6 +373,7 @@ function AppContent() {
             {activeTab === 'accounts' && (
               <Accounts
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates}
+                transactions={transactions}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt}
                 addAsset={addAsset} updateAssetValue={updateAssetValue}
