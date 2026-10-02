@@ -3,6 +3,7 @@ import { db, whenSaved } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES, ASSET_TYPES } from '../hooks/useFinanceData';
 import { useExchangeRates } from '../hooks/useExchangeRates';
+import { DEMO } from '../demo';
 
 // ─── Currency catalogue ────────────────────────────────────────────────────
 
@@ -127,14 +128,14 @@ export function PreferencesProvider({ children, userId }) {
   const [prefs, setPrefs] = useState(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     applyTheme(savedTheme);
-    return { ...DEFAULT_PREFS, theme: savedTheme };
+    return { ...DEFAULT_PREFS, theme: savedTheme, ...(DEMO ? { currency: 'GBP' } : {}) };
   });
-  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsLoading, setPrefsLoading] = useState(!DEMO);
   const [locked, setLocked]             = useState(false);
 
   // ── Load from Firestore ────────────────────────────────────────────────
   useEffect(() => {
-    if (!userId) { setPrefsLoading(false); return; }
+    if (!userId || DEMO) { setPrefsLoading(false); return; }
     const unsub = onSnapshot(
       doc(db, 'users', userId, 'preferences', 'main'),
       { includeMetadataChanges: true },   // so we also hear when the server confirms "no doc"

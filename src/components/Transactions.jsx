@@ -513,7 +513,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                         </span>
                       )}
                     </td>
-                    <td><TypeBadge type={t.type} /></td>
+                    <td className="tx-type"><TypeBadge type={t.type} /></td>
                     <td className={`tx-amount ${t.type}`}>
                       {typeSignMap[t.type] || ''}{fmtCur(t.amount, t.currency)}
                       {isTransfer && t.toCurrency !== t.currency

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, clearLocalData } from '../firebase';
+import { DEMO, demoUser } from '../demo';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -16,8 +17,8 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(DEMO ? demoUser : null);
+  const [loading, setLoading] = useState(!DEMO);
 
   async function signup(email, password, displayName) {
     const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -40,6 +41,7 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    if (DEMO) return;
     const unsubscribe = onAuthStateChanged(auth, user => {
       setCurrentUser(user);
       setLoading(false);

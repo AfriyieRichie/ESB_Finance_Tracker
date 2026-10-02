@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw, TrendingUp, TrendingDown, ArrowLeftRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, ArrowLeftRight, ChevronRight } from 'lucide-react';
 import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
 import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
@@ -834,25 +834,63 @@ function TransferModal({ accounts, onTransfer, onClose }) {
   );
 }
 
+// ─── Group tile (Cash / Debts / Investments): summary that expands its items ─
+
+function GroupTile({ id, title, count, noun, open, onToggle, onAdd, addTitle, children }) {
+  return (
+    <div className={`group-card ${open ? 'active' : ''}`} role="button" tabIndex={0}
+      aria-expanded={open}
+      onClick={() => onToggle(id)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(id); } }}>
+      <div className="bg-head">
+        <span className="bg-title">{title}</span>
+        <span className="bg-head-right">
+          <span className="bg-count">
+            {count} {count === 1 ? noun : `${noun}s`}
+            <ChevronRight size={13} strokeWidth={1.8} className="bg-chevron" />
+          </span>
+          <button type="button" className="icon-btn bg-add" title={addTitle}
+            onClick={e => { e.stopPropagation(); onAdd(); }}
+            onKeyDown={e => e.stopPropagation()}>
+            <Plus size={14} strokeWidth={1.8} />
+          </button>
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
 export default function Accounts({ accounts, debts, assets, transactions = [], missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
-  const { fmt, fmtCur, baseCurrency } = usePreferences();
+  const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
 
-  // ── Net worth calculation (everything converted to the base currency) ──
+  // ── Totals per group, in the base currency ────────────────────────────
+  const activeAssets = assets.filter(a => a.status === 'active');
+  const openDebts    = debts.filter(d => d.status !== 'paid');
+  const base = (amount, cur) => toBase(amount || 0, cur) ?? 0;
+
   const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
-  const totalDebts       = debts.filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
-  const totalInvestments = assets.filter(a => a.status === 'active').reduce((s, a) => s + (a.baseValue || 0), 0);
+  const totalDebts       = openDebts.reduce((s, d) => s + (d.baseBalance || 0), 0);
+  const totalBorrowed    = openDebts.reduce((s, d) => s + base(d.originalAmount || d.currentBalance, d.currency), 0);
+  const monthlyPayments  = openDebts.reduce((s, d) => s + base(d.monthlyPayment, d.currency), 0);
+  const paidPct          = totalBorrowed > 0 ? Math.max(0, Math.min(100, (1 - totalDebts / totalBorrowed) * 100)) : 0;
+  const totalInvested    = activeAssets.reduce((s, a) => s + base(a.costBasis, a.currency), 0);
+  const totalInvestments = activeAssets.reduce((s, a) => s + (a.baseValue || 0), 0);
+  const investGain       = totalInvestments - totalInvested;
   const netWorth         = totalCash + totalInvestments - totalDebts;
 
-  // Cash held per currency, base currency first
+  // Cash held per currency, base currency first (shown on the Cash tile)
   const cashByCurrency = Object.entries(
     accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
   ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
 
-  const activeAssets = assets.filter(a => a.status === 'active');
+  // Which group's items are showing; all collapsed at first
+  const [openGroup, setOpenGroup] = useState(null);
+  const toggle = (g) => setOpenGroup(cur => (cur === g ? null : g));
 
   return (
     <div className="accounts-page">
@@ -870,39 +908,13 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
         </div>
       </div>
 
-      {/* ── Net Worth Hero ── */}
+      {/* ── Net worth (the group tiles below carry the breakdown) ── */}
       <div className="net-worth-hero">
         <div className="nw-main">
           <span className="nw-label">Total Net Worth</span>
           <span className={`nw-value ${netWorth >= 0 ? '' : 'neg'}`}>{fmt(netWorth)}</span>
+          <span className="nw-sub">Cash + investments − debts, in {baseCurrency}</span>
         </div>
-        <div className="nw-breakdown">
-          <div className="nw-item">
-            <TrendingUp size={14} strokeWidth={1.5} color="#c8ddd5" />
-            <span className="nw-item-label">Cash</span>
-            <span className="nw-item-val" style={{ color: 'var(--success)' }}>{fmt(totalCash)}</span>
-          </div>
-          <div className="nw-item">
-            <TrendingUp size={14} strokeWidth={1.5} color="#c8ddd5" />
-            <span className="nw-item-label">Investments</span>
-            <span className="nw-item-val" style={{ color: 'var(--info)' }}>{fmt(totalInvestments)}</span>
-          </div>
-          <div className="nw-item">
-            <TrendingDown size={14} strokeWidth={1.5} color="#c8ddd5" />
-            <span className="nw-item-label">Debts</span>
-            <span className="nw-item-val" style={{ color: 'var(--danger)' }}>-{fmt(totalDebts)}</span>
-          </div>
-        </div>
-        {cashByCurrency.length > 1 && (
-          <div className="fx-breakdown">
-            {cashByCurrency.map(([cur, amt]) => (
-              <span key={cur} className="fx-chip">
-                {fmtCur(amt, cur)}
-                <BaseApprox amount={amt} currency={cur} />
-              </span>
-            ))}
-          </div>
-        )}
       </div>
 
       {missingRates.length > 0 && (
@@ -912,77 +924,123 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
         </p>
       )}
 
-      {/* ── Cash Accounts ── */}
-      <div className="accounts-section">
-        <div className="section-header">
-          <h3>Cash Accounts</h3>
-          <button className="icon-btn" onClick={() => setModal({ type: 'account' })} title="Add account">
-            <Plus size={15} strokeWidth={1.6} />
-          </button>
-        </div>
-        {accounts.length === 0 ? (
-          <p className="accounts-empty">No accounts yet. Add one to get started.</p>
-        ) : (
-          <div className="acct-list">
-            {accounts.map(a => (
-              <AccountCard
-                key={a.id}
-                account={a}
-                onEdit={acct => setModal({ type: 'account', data: acct })}
-                onDelete={deleteAccount}
-                onReconcile={acct => setModal({ type: 'reconcile', data: acct })}
-                onOpen={acct => setModal({ type: 'activity', data: acct })}
-              />
-            ))}
+      <div className="group-grid">
+        {/* ── Cash Accounts ── */}
+        <GroupTile id="cash" open={openGroup === 'cash'} onToggle={toggle} title="Cash Accounts" count={accounts.length} noun="account"
+          onAdd={() => setModal({ type: 'account' })} addTitle="Add account">
+          {accounts.length === 0 ? (
+            <span className="bg-empty">No accounts yet</span>
+          ) : (
+            <>
+              <div>
+                <span className="bs-label">Total</span>
+                <span className="bg-val" style={{ display: 'block', fontSize: 20 }}>{fmt(totalCash)}</span>
+              </div>
+              {cashByCurrency.length > 1 && (
+                <div className="bg-chips">
+                  {cashByCurrency.map(([cur, amt]) => (
+                    <span key={cur} className="fx-chip">{fmtCur(amt, cur)}</span>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </GroupTile>
+        {openGroup === 'cash' && (
+          <div className="group-panel">
+            {accounts.length === 0 ? (
+              <p className="accounts-empty">No accounts yet. Add one to get started.</p>
+            ) : (
+              <div className="acct-list">
+                {accounts.map(a => (
+                  <AccountCard
+                    key={a.id}
+                    account={a}
+                    onEdit={acct => setModal({ type: 'account', data: acct })}
+                    onDelete={deleteAccount}
+                    onReconcile={acct => setModal({ type: 'reconcile', data: acct })}
+                    onOpen={acct => setModal({ type: 'activity', data: acct })}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* ── Debts ── */}
-      <div className="accounts-section">
-        <div className="section-header">
-          <h3>Debts & Loans</h3>
-          <button className="icon-btn" onClick={() => setModal({ type: 'debt' })} title="Add debt">
-            <Plus size={15} strokeWidth={1.6} />
-          </button>
-        </div>
-        {debts.length === 0 ? (
-          <p className="accounts-empty">No debts recorded. Add a loan or informal debt to track it.</p>
-        ) : (
-          <div className="acct-list">
-            {debts.map(d => (
-              <DebtCard
-                key={d.id}
-                debt={d}
-                onEdit={debt => setModal({ type: 'debt', data: debt })}
-                onDelete={deleteDebt}
-              />
-            ))}
+        {/* ── Debts & Loans ── */}
+        <GroupTile id="debts" open={openGroup === 'debts'} onToggle={toggle} title="Debts & Loans" count={openDebts.length} noun="debt"
+          onAdd={() => setModal({ type: 'debt' })} addTitle="Add debt">
+          {openDebts.length === 0 ? (
+            <span className="bg-empty">No debts recorded</span>
+          ) : (
+            <>
+              <div className="bg-figures">
+                <div><span className="bs-label">Owed</span><span className="bg-val bad">{fmt(totalDebts)}</span></div>
+                <div><span className="bs-label">Paid off</span><span className="bg-val">{Math.round(paidPct)}%</span></div>
+                <div><span className="bs-label">Monthly</span><span className="bg-val">{monthlyPayments > 0 ? fmt(monthlyPayments) : '—'}</span></div>
+              </div>
+              <div className="bg-progress">
+                <div className="progress-bar-wrap" style={{ height: 6 }}>
+                  <div className="progress-bar-fill" style={{ width: `${paidPct}%`, background: 'var(--success)' }} />
+                </div>
+              </div>
+            </>
+          )}
+        </GroupTile>
+        {openGroup === 'debts' && (
+          <div className="group-panel">
+            {debts.length === 0 ? (
+              <p className="accounts-empty">No debts recorded. Add a loan or informal debt to track it.</p>
+            ) : (
+              <div className="acct-list">
+                {debts.map(d => (
+                  <DebtCard
+                    key={d.id}
+                    debt={d}
+                    onEdit={debt => setModal({ type: 'debt', data: debt })}
+                    onDelete={deleteDebt}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* ── Investments & Assets ── */}
-      <div className="accounts-section">
-        <div className="section-header">
-          <h3>Investments & Assets</h3>
-          <button className="icon-btn" onClick={() => setModal({ type: 'asset' })} title="Add asset">
-            <Plus size={15} strokeWidth={1.6} />
-          </button>
-        </div>
-        {activeAssets.length === 0 ? (
-          <p className="accounts-empty">No assets tracked yet. Add a treasury bill, property, or any investment.</p>
-        ) : (
-          <div className="asset-grid">
-            {activeAssets.map(a => (
-              <AssetCard
-                key={a.id}
-                asset={a}
-                onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
-                onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
-                onDelete={deleteAsset}
-              />
-            ))}
+        {/* ── Investments & Assets ── */}
+        <GroupTile id="assets" open={openGroup === 'assets'} onToggle={toggle} title="Investments & Assets" count={activeAssets.length} noun="asset"
+          onAdd={() => setModal({ type: 'asset' })} addTitle="Add asset">
+          {activeAssets.length === 0 ? (
+            <span className="bg-empty">No investments tracked</span>
+          ) : (
+            <div className="bg-figures">
+              <div><span className="bs-label">Invested</span><span className="bg-val">{fmt(totalInvested)}</span></div>
+              <div><span className="bs-label">Value</span><span className="bg-val">{fmt(totalInvestments)}</span></div>
+              <div>
+                <span className="bs-label">Gain / loss</span>
+                <span className={`bg-val ${investGain >= 0 ? 'good' : 'bad'}`}>
+                  {investGain >= 0 ? '+' : '−'}{fmt(Math.abs(investGain))}
+                </span>
+              </div>
+            </div>
+          )}
+        </GroupTile>
+        {openGroup === 'assets' && (
+          <div className="group-panel">
+            {activeAssets.length === 0 ? (
+              <p className="accounts-empty">No assets tracked yet. Add a treasury bill, property, or any investment.</p>
+            ) : (
+              <div className="asset-grid">
+                {activeAssets.map(a => (
+                  <AssetCard
+                    key={a.id}
+                    asset={a}
+                    onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
+                    onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
+                    onDelete={deleteAsset}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -47,16 +47,32 @@ export async function enableNotifications(uid) {
   return { permission, push };
 }
 
+// Resolves with a service worker registration that has an ACTIVE worker. Right after install the
+// worker may still be starting, and showNotification() throws until it's active. Gives up after 10s.
+function activeRegistration() {
+  if (!navigator.serviceWorker) return Promise.resolve(null);
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise(resolve => setTimeout(() => resolve(null), 10000)),
+  ]);
+}
+
 // Shows a notification on this device (via the service worker, which Android requires).
+// Returns { ok: true } or { ok: false, reason } so callers can tell the user what happened.
 export async function notify(title, body, tag) {
-  if (notificationStatus() !== 'granted') return;
-  const options = { body, tag, icon: '/pwa-192x192.png', data: { url: '/' } };
+  if (notificationStatus() !== 'granted') return { ok: false, reason: 'Notifications are not allowed on this device.' };
+  const options = { body, tag, icon: '/pwa-192x192.png', badge: '/pwa-192x192.png', data: { url: '/' } };
   try {
-    const reg = await getRegistration();
-    if (reg) await reg.showNotification(title, options);
-    else new Notification(title, options);
+    const reg = await activeRegistration();
+    if (reg) {
+      await reg.showNotification(title, options);
+    } else {
+      new Notification(title, options);   // desktop browsers without a service worker (e.g. dev)
+    }
+    return { ok: true };
   } catch (err) {
     console.warn('Could not show notification:', err);
+    return { ok: false, reason: err?.message || 'The browser refused to show the notification.' };
   }
 }
 

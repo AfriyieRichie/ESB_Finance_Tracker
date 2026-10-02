@@ -2052,13 +2052,24 @@
   color: var(--text-1);
 }
 
-/* ─── Budget groups (Income / Expenses / Savings) ─────── */
-.budget-groups {
+/* ─── Group tiles (Budget: Income/Expenses/Savings · Accounts: Cash/Debts/Investments) ─
+   A tile's items open in a full-width panel placed right after it; `dense` lets the other
+   tiles stay on the first row on desktop while the panel drops below. */
+.group-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: row dense;
   gap: 14px;
 }
-.budget-group-card {
+.group-panel { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; }
+.group-card .bg-chevron { transition: transform .2s ease; }
+.group-card.active .bg-chevron { transform: rotate(90deg); }
+.group-card:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.bg-head-right { display: inline-flex; align-items: center; gap: 8px; }
+.bg-add { width: 26px; height: 26px; }
+.bg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nw-sub { font-size: 12.5px; color: var(--text-3); }
+.group-card {
   text-align: left;
   font: inherit;
   color: inherit;
@@ -2073,8 +2084,8 @@
   transition: var(--transition);
   box-shadow: var(--shadow-card);
 }
-.budget-group-card:hover  { border-color: var(--border-light); }
-.budget-group-card.active { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset, var(--shadow-card); }
+.group-card:hover  { border-color: var(--border-light); }
+.group-card.active { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset, var(--shadow-card); }
 .bg-head  { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bg-title { font-size: 15px; font-weight: 700; color: var(--text-1); }
 .bg-count { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--text-3); }
@@ -2088,7 +2099,7 @@
 .bg-progress .progress-bar-wrap { flex: 1; }
 
 @media (max-width: 900px) {
-  .budget-groups { grid-template-columns: 1fr; }
+  .group-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ─── Install & notifications ─────────────────────────── */
@@ -2158,3 +2169,58 @@ img.logo-on-light { display: none; }
   .activity-row { grid-template-columns: 1fr auto; }
   .activity-date { grid-column: span 2; font-size: 11.5px; }
 }
+
+/* ─── Charts: no focus box on tap; feedback comes from the mark itself ─ */
+.recharts-wrapper, .recharts-wrapper * { -webkit-tap-highlight-color: transparent; }
+.recharts-wrapper :focus,
+.recharts-wrapper:focus,
+.recharts-surface:focus { outline: none; }
+
+/* ─── Settings explanatory notes line up with the rows ─ */
+.settings-note { display: block; padding: 10px 20px 6px; line-height: 1.6; }
+
+/* ─── Mobile layout fixes ─────────────────────────────── */
+/* Grid items default to min-width:auto, which let long text push past the card edge */
+.recent-list--horizontal > * { min-width: 0; }
+
+/* Account cards: name/type truncate instead of squeezing into a narrow column */
+.acct-card-left { flex: 1; min-width: 0; }
+.acct-card-left > div { min-width: 0; }
+.acct-name, .acct-type { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-card-right { flex-shrink: 0; }
+
+@media (max-width: 600px) {
+  .acct-card { padding: 12px; gap: 10px; }
+  .acct-card-right { gap: 6px; }
+  .acct-actions .icon-btn { width: 28px; height: 28px; }
+
+  /* Transactions: table becomes a list of cards so the amount is always visible */
+  .tx-table-wrap { overflow: visible; }
+  .tx-table { min-width: 0; }
+  .tx-table thead { display: none; }
+  .tx-table, .tx-table tbody { display: block; }
+  .tx-table tr.tx-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "desc   amount"
+      "meta   actions";
+    gap: 4px 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tx-table tr.tx-row:last-child { border-bottom: none; }
+  .tx-table td { padding: 0; border: none; }
+  .tx-table td.tx-desc   { grid-area: desc; max-width: none; font-size: 14px; }
+  .tx-table td.tx-amount { grid-area: amount; text-align: right; font-size: 14px; }
+  .tx-table td.tx-actions{ grid-area: actions; }
+  /* date, category and type share the second line */
+  .tx-table td.tx-date, .tx-table td.tx-cat, .tx-table td.tx-type { grid-area: meta; }
+  .tx-table td.tx-cat  { padding-left: 92px; }
+  .tx-table td.tx-type { display: none; }
+  .tx-table td.tx-date { align-self: center; font-size: 12px; }
+  .tx-table td.tx-cat .cat-badge { font-size: 11.5px; padding: 2px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* Net worth box: label, amount and explanation stacked */
+.nw-main { display: flex; flex-direction: column; gap: 6px; }

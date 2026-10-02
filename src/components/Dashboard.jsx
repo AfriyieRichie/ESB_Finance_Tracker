@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
-  BarChart, Bar, Rectangle,
+  BarChart, Bar, Rectangle, Sector,
 } from 'recharts';
 import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
@@ -15,16 +15,26 @@ const TOOLTIP_STYLE = {
   fontSize: '13px',
 };
 
-// Green-shade palette for donut charts (dark → light)
-const DONUT_PALETTE = [
-  '#1a5c2e',
-  '#237a3b',
-  '#2fa04f',
-  '#52b96a',
-  '#82cf95',
-  '#aadeb7',
-  '#ccefd4',
-];
+// Categorical palette for donut charts: distinct hues in a fixed order, validated for colour-blind
+// separation against each theme's card surface. Past 7 categories the smallest fold into "Other"
+// (neutral grey) rather than reusing a colour.
+const DONUT_PALETTE = {
+  dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'],
+  light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
+};
+const OTHER_COLOR  = { dark: '#6b7a71', light: '#9aa59f' };
+const CARD_SURFACE = { dark: '#101512', light: '#ffffff' };   // 2px gap between segments
+
+// [name, value] pairs → largest-first slices with colours; folds the tail into "Other" past 7
+function toDonutSlices(entries, theme) {
+  const palette = DONUT_PALETTE[theme];
+  const sorted  = entries.sort((a, b) => b[1] - a[1]);
+  const shown   = sorted.length > palette.length ? sorted.slice(0, palette.length - 1) : sorted;
+  const rest    = sorted.slice(shown.length).reduce((sum, [, v]) => sum + v, 0);
+  const slices  = shown.map(([name, value], i) => ({ name, value, color: palette[i] }));
+  if (rest > 0) slices.push({ name: 'Other', value: rest, color: OTHER_COLOR[theme] });
+  return slices;
+}
 
 // Hovered bar "pops out": slightly wider and taller, brighter, with a soft outline
 const PopBar = ({ x, y, width, height, fill, highlight }) => (
@@ -32,6 +42,9 @@ const PopBar = ({ x, y, width, height, fill, highlight }) => (
     radius={[7, 7, 0, 0]} fill={highlight || fill}
     stroke="rgba(234,245,239,0.35)" strokeWidth={1} />
 );
+
+// Hovered/tapped donut slice "pops out": a few px further out, same colour
+const PopSlice = (props) => <Sector {...props} outerRadius={props.outerRadius + 6} />;
 
 // Series whose bar colour is too dark to read as text in the tooltip
 const TOOLTIP_TEXT_COLOR = { Budget: '#9cc7ad' };
@@ -54,7 +67,10 @@ const PieTooltip = ({ active, payload, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={TOOLTIP_STYLE} className="chart-tooltip">
-      <p style={{ color: payload[0].payload.color, marginBottom: 4 }}>{payload[0].name}</p>
+      <p style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span className="pie-dot" style={{ background: payload[0].payload.color }} />
+        {payload[0].name}
+      </p>
       <p><strong>{fmt ? fmt(payload[0].value) : payload[0].value}</strong></p>
     </div>
   );
@@ -63,6 +79,8 @@ const PieTooltip = ({ active, payload, fmt }) => {
 // All totals here use base-currency values (baseAmount / baseBalance / baseValue) computed in App
 export default function Dashboard({ transactions, budgets, accounts, debts, assets, missingRates = [] }) {
   const { prefs, fmt, fmtCur, baseCurrency, rateFor, ratesDate } = usePreferences();
+  // Effective theme ('system' is already resolved onto <html data-theme>)
+  const theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
   const hidden = prefs.hideBalances;
   const mask   = '••••••';
 
@@ -98,10 +116,8 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'expense')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
-    return Object.entries(acc)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
-  }, [transactions, currentMonth]);
+    return toDonutSlices(Object.entries(acc), theme);
+  }, [transactions, currentMonth, theme]);
 
   // ── Savings breakdown (donut) ──────────────────────────────────────────
   const savingsCategoryData = useMemo(() => {
@@ -109,10 +125,8 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'savings')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
-    return Object.entries(acc)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({ name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length] }));
-  }, [transactions, currentMonth]);
+    return toDonutSlices(Object.entries(acc), theme);
+  }, [transactions, currentMonth, theme]);
 
   // ── Monthly trend (area chart) – last 6 months ─────────────────────────
   const monthlyTrend = useMemo(() => {
@@ -261,14 +275,14 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie data={expenseCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
-                    dataKey="value" paddingAngle={3}>
-                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
+                    dataKey="value" paddingAngle={3} activeShape={PopSlice}>
+                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke={CARD_SURFACE[theme]} strokeWidth={2} />)}
                   </Pie>
                   <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pie-legend">
-                {expenseCategoryData.slice(0, 5).map(d => (
+                {expenseCategoryData.map(d => (
                   <div key={d.name} className="pie-legend-item">
                     <span className="pie-dot" style={{ background: d.color }} />
                     <span className="pie-name">{d.name}</span>
@@ -323,8 +337,8 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie data={savingsCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
-                    dataKey="value" paddingAngle={3}>
-                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="#101512" strokeWidth={2} />)}
+                    dataKey="value" paddingAngle={3} activeShape={PopSlice}>
+                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke={CARD_SURFACE[theme]} strokeWidth={2} />)}
                   </Pie>
                   <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, whenSaved } from '../firebase';
+import { DEMO, demoData } from '../demo';
 import {
   collection, doc, addDoc, deleteDoc, setDoc, onSnapshot,
   updateDoc, increment, writeBatch, deleteField,
@@ -135,17 +136,18 @@ const assetAmt = t => t.assetAmount ?? t.amount;
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
 export function useFinanceData(userId) {
-  const [transactions, setTransactions] = useState([]);
-  const [budgets,      setBudgets]      = useState([]);
-  const [accounts,     setAccounts]     = useState([]);
-  const [debts,        setDebts]        = useState([]);
-  const [assets,       setAssets]       = useState([]);
-  const [loading,      setLoading]      = useState(true);
+  const [demo]                          = useState(() => (DEMO ? demoData() : null));
+  const [transactions, setTransactions] = useState(demo?.transactions || []);
+  const [budgets,      setBudgets]      = useState(demo?.budgets || []);
+  const [accounts,     setAccounts]     = useState(demo?.accounts || []);
+  const [debts,        setDebts]        = useState(demo?.debts || []);
+  const [assets,       setAssets]       = useState(demo?.assets || []);
+  const [loading,      setLoading]      = useState(!demo);
   // True once the server (not just the offline cache) has confirmed the accounts list
-  const [accountsConfirmed, setAccountsConfirmed] = useState(false);
+  const [accountsConfirmed, setAccountsConfirmed] = useState(!!demo);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || DEMO) return;
 
     const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false };
     const checkDone = () => { if (Object.values(loaded).every(Boolean)) setLoading(false); };

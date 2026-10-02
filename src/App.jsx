@@ -13,6 +13,7 @@ import BrandLogo from './components/BrandLogo';
 import { useFinanceData } from './hooks/useFinanceData';
 import { useInstall } from './pwa';
 import { notify, registerPush } from './notifications';
+import { DEMO } from './demo';
 import './App.css';
 
 const TABS = [
@@ -92,7 +93,9 @@ function AppContent() {
 
   // Push tokens can rotate; refresh this device's registration once per session
   useEffect(() => { if (currentUser?.uid) registerPush(currentUser.uid); }, [currentUser?.uid]);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // In local demo mode ?tab=budget etc. opens a specific page (for UI reviews/screenshots)
+  const [activeTab, setActiveTab] = useState(() =>
+    (DEMO && new URLSearchParams(window.location.search).get('tab')) || 'dashboard');
   const [showNudge, setShowNudge] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const mobileMenuRef = useRef(null);

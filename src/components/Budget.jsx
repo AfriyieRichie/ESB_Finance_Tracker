@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { Wallet, ChevronRight } from 'lucide-react';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
@@ -93,7 +93,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [activeType, setActiveType] = useState('expense');
+  const [activeType, setActiveType] = useState(null);   // which group is expanded; none at first
   const [showModal, setShowModal]   = useState(false);
   const [editing, setEditing]       = useState(null);
 
@@ -145,8 +145,6 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
   ];
   const canAdd = allPossible.some(key => !alreadySet.has(key));
 
-  const group  = GROUPS.find(g => g.type === activeType);
-  const active = totals[activeType];
 
   return (
     <div className="budget-page">
@@ -173,7 +171,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
       ) : (
         <>
           {/* ── Per-type totals: click one to show its budgets ── */}
-          <div className="budget-groups">
+          <div className="group-grid">
             {GROUPS.map(g => {
               const t      = totals[g.type];
               const left   = t.budgeted - t.used;
@@ -181,14 +179,16 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
               const pct    = t.budgeted > 0 ? (t.used / t.budgeted) * 100 : 0;
               const status = over ? (g.overGood ? 'good' : 'bad') : 'neutral';
               return (
-                <button key={g.type} type="button"
-                  className={`budget-group-card ${activeType === g.type ? 'active' : ''}`}
-                  onClick={() => setActiveType(g.type)}>
+                <Fragment key={g.type}>
+                <button type="button"
+                  className={`group-card ${activeType === g.type ? 'active' : ''}`}
+                  aria-expanded={activeType === g.type}
+                  onClick={() => setActiveType(t => (t === g.type ? null : g.type))}>
                   <div className="bg-head">
                     <span className="bg-title">{g.title}</span>
                     <span className="bg-count">
                       {t.count} {t.count === 1 ? 'budget' : 'budgets'}
-                      <ChevronRight size={13} strokeWidth={1.8} />
+                      <ChevronRight size={13} strokeWidth={1.8} className="bg-chevron" />
                     </span>
                   </div>
                   {t.count === 0 ? (
@@ -219,78 +219,79 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                     </>
                   )}
                 </button>
+                {activeType === g.type && (
+                  <div className="group-panel">
+                    {t.count === 0 ? (
+                      <div className="empty-state-sm" style={{ height: 'auto', padding: '20px 0' }}>
+                        No {g.title.toLowerCase()} budgets for {monthName}.&nbsp;
+                        <button type="button" className="auth-switch-link" onClick={openAdd}>Add one</button>
+                      </div>
+                    ) : (
+                  <div className="budget-grid">
+                    {t.list.map(b => {
+                      const spent = spending[`${g.type}:${b.category}`] || 0;
+                      const pct   = Math.min((spent / b.amount) * 100, 100);
+                      const over  = spent > b.amount;
+                      const warn  = pct >= 70 && !over && !g.overGood;
+                      const barColor = '#ffffff';
+
+                      return (
+                        <div key={b.id} className="budget-card">
+                          <div className="bc-header">
+                            <div className="bc-cat">
+                              <div
+                                className="bc-icon-ring"
+                                style={{ '--pct': `${pct}%`, '--ring-color': '#00a854' }}
+                              >
+                                <div className="bc-icon-inner">
+                                  <CategoryIcon name={b.category} size={19} />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="bc-name">{b.category}</span>
+                              </div>
+                            </div>
+                            <div className="bc-actions">
+                              <button className="icon-btn edit-btn" onClick={() => openEdit(b)} title="Edit">✎</button>
+                              <button className="icon-btn delete-btn" onClick={() => deleteBudget(b.id)} title="Delete">✕</button>
+                            </div>
+                          </div>
+
+                          <div className="bc-amounts">
+                            <div>
+                              <span className="bc-amt-label">{g.used}</span>
+                              <span className={`bc-amt-val ${over && !g.overGood ? 'over-budget' : ''}`}>{fmt(spent)}</span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span className="bc-amt-label">Budget</span>
+                              <span className="bc-amt-val">{fmt(b.amount)}</span>
+                            </div>
+                          </div>
+
+                          <div className="progress-bar-wrap">
+                            <div className="progress-bar-fill" style={{ width: `${pct}%`, background: barColor }} />
+                          </div>
+
+                          <div className="bc-footer">
+                            <span className={`bc-status ${over ? (g.overGood ? 'ok' : 'over') : warn ? 'warn' : 'ok'}`}>
+                              {over
+                                ? `${g.overGood ? 'Ahead by' : 'Over by'} ${fmt(spent - b.amount)}`
+                                : `${fmt(b.amount - spent)} ${g.left.toLowerCase()}`}
+                            </span>
+                            <span className="bc-pct">{Math.round(pct)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                    )}
+                  </div>
+                )}
+                </Fragment>
               );
             })}
           </div>
 
-          {/* ── Budgets for the selected type ── */}
-          <div className="section-header">
-            <h3>{group.title} budgets</h3>
-          </div>
-          {active.count === 0 ? (
-            <div className="empty-state-sm" style={{ padding: '24px 0' }}>
-              No {group.title.toLowerCase()} budgets for {monthName}.{' '}
-              <button type="button" className="auth-switch-link" onClick={openAdd}>Add one</button>
-            </div>
-          ) : (
-            <div className="budget-grid">
-              {active.list.map(b => {
-                const spent = spending[`${activeType}:${b.category}`] || 0;
-                const pct   = Math.min((spent / b.amount) * 100, 100);
-                const over  = spent > b.amount;
-                const warn  = pct >= 70 && !over && !group.overGood;
-                const barColor = '#ffffff';
-
-                return (
-                  <div key={b.id} className="budget-card">
-                    <div className="bc-header">
-                      <div className="bc-cat">
-                        <div
-                          className="bc-icon-ring"
-                          style={{ '--pct': `${pct}%`, '--ring-color': '#00a854' }}
-                        >
-                          <div className="bc-icon-inner">
-                            <CategoryIcon name={b.category} size={19} />
-                          </div>
-                        </div>
-                        <div>
-                          <span className="bc-name">{b.category}</span>
-                        </div>
-                      </div>
-                      <div className="bc-actions">
-                        <button className="icon-btn edit-btn" onClick={() => openEdit(b)} title="Edit">✎</button>
-                        <button className="icon-btn delete-btn" onClick={() => deleteBudget(b.id)} title="Delete">✕</button>
-                      </div>
-                    </div>
-
-                    <div className="bc-amounts">
-                      <div>
-                        <span className="bc-amt-label">{group.used}</span>
-                        <span className={`bc-amt-val ${over && !group.overGood ? 'over-budget' : ''}`}>{fmt(spent)}</span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span className="bc-amt-label">Budget</span>
-                        <span className="bc-amt-val">{fmt(b.amount)}</span>
-                      </div>
-                    </div>
-
-                    <div className="progress-bar-wrap">
-                      <div className="progress-bar-fill" style={{ width: `${pct}%`, background: barColor }} />
-                    </div>
-
-                    <div className="bc-footer">
-                      <span className={`bc-status ${over ? (group.overGood ? 'ok' : 'over') : warn ? 'warn' : 'ok'}`}>
-                        {over
-                          ? `${group.overGood ? 'Ahead by' : 'Over by'} ${fmt(spent - b.amount)}`
-                          : `${fmt(b.amount - spent)} ${group.left.toLowerCase()}`}
-                      </span>
-                      <span className="bc-pct">{Math.round(pct)}%</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </>
       )}
 
@@ -298,7 +299,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
         <BudgetModal
           month={monthStr}
           existing={editing}
-          defaultType={activeType}
+          defaultType={activeType || 'expense'}
           onSave={upsertBudget}
           onClose={() => setShowModal(false)}
         />

@@ -271,12 +271,12 @@ function ExchangeRatesSection({ accounts, debts, assets }) {
         </button>
       </SettingsRow>
       {inUse.length === 0 ? (
-        <p className="settings-row-hint" style={{ padding: '4px 0 8px' }}>
+        <p className="settings-row-hint settings-note">
           All your accounts are in {baseCurrency}. Rates appear here once you add an account in another currency.
         </p>
       ) : (
         <>
-          <p className="settings-row-hint" style={{ padding: '4px 0 8px' }}>
+          <p className="settings-row-hint settings-note">
             Leave blank to use the live rate. Enter your own if the rate you actually get (e.g. via MoMo
             or a remittance app) differs. New transactions save the rate of the day they're recorded.
           </p>
@@ -444,7 +444,7 @@ function ManageCategoriesSection({ assets }) {
 
   return (
     <Section icon={Sliders} title="Manage Categories">
-      <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16, lineHeight: 1.6 }}>
+      <p className="settings-row-hint settings-note">
         Hide built-in categories you don't use. Hidden categories won't appear in dropdowns
         but historical transactions still reference them correctly.
       </p>
@@ -530,13 +530,20 @@ function PushRow() {
           </button>
         )}
         {status === 'granted' && (
-          <button type="button" className="btn-ghost" style={{ fontSize: 13 }}
-            onClick={() => notify('Notifications are working', 'You\'ll get your MiAhorro alerts here.', 'test')}>
-            Send test
+          <button type="button" className="btn-ghost" style={{ fontSize: 13 }} disabled={busy}
+            onClick={async () => {
+              setBusy(true); setMsg('');
+              const res = await notify('Notifications are working', 'You\'ll get your MiAhorro alerts here.', 'test');
+              setMsg(res.ok
+                ? 'Test sent. Check your notification bar. If nothing appears, turn on notifications for this app in your phone settings.'
+                : `Could not send the test: ${res.reason}`);
+              setBusy(false);
+            }}>
+            {busy ? 'Sending…' : 'Send test'}
           </button>
         )}
       </SettingsRow>
-      <StatusMsg msg={msg} error={msg.includes('could not')} />
+      <StatusMsg msg={msg} error={/could not/i.test(msg)} />
     </>
   );
 }
@@ -549,7 +556,7 @@ function NotificationsSection() {
     <Section icon={Bell} title="Notifications">
       <InstallRow />
       <PushRow />
-      <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '8px 0 4px', lineHeight: 1.6 }}>
+      <p className="settings-row-hint settings-note">
         Budget and large-transaction alerts notify you as you record transactions. The daily reminder
         (8pm, only if nothing was recorded) and weekly digest (Sundays, 6pm) arrive even when the app is closed.
       </p>
