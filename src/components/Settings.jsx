@@ -1,8 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   User, Palette, Bell, Shield, Database, LogOut, Trash2,
   Eye, EyeOff, Download, Upload, Lock, Plus, X, Check,
-  ChevronRight, Sliders, ArrowLeftRight, RefreshCw,
+  ChevronRight, ChevronLeft, Sliders, ArrowLeftRight, RefreshCw, Coins,
 } from 'lucide-react';
 import CategoryIcon from './CategoryIcon';
 import { updateProfile, updateEmail, deleteUser } from 'firebase/auth';
@@ -134,12 +134,6 @@ function ProfileSection({ currentUser }) {
 
 function PreferencesSection() {
   const { prefs, updatePrefs } = usePreferences();
-  const [currencySearch, setCurrencySearch] = useState('');
-
-  const filteredCurrencies = CURRENCIES.filter(c =>
-    c.name.toLowerCase().includes(currencySearch.toLowerCase()) ||
-    c.code.toLowerCase().includes(currencySearch.toLowerCase())
-  );
 
   return (
     <Section icon={Palette} title="Preferences">
@@ -153,30 +147,6 @@ function PreferencesSection() {
               {t === 'light' ? '☀ Light' : t === 'dark' ? '🌙 Dark' : '⚙ System'}
             </button>
           ))}
-        </div>
-      </SettingsRow>
-
-      {/* Currency */}
-      <SettingsRow label="Base Currency" hint="Net worth, totals, budgets and charts are converted into this currency">
-        <div className="currency-picker">
-          <input
-            type="text"
-            className="currency-search"
-            placeholder="Search…"
-            value={currencySearch}
-            onChange={e => setCurrencySearch(e.target.value)}
-          />
-          <div className="currency-list">
-            {filteredCurrencies.map(c => (
-              <button key={c.code} type="button"
-                className={`currency-option ${prefs.currency === c.code ? 'active' : ''}`}
-                onClick={() => updatePrefs({ currency: c.code })}>
-                <span className="currency-symbol">{c.symbol}</span>
-                <span className="currency-name">{c.name}</span>
-                {prefs.currency === c.code && <Check size={13} strokeWidth={2} />}
-              </button>
-            ))}
-          </div>
         </div>
       </SettingsRow>
 
@@ -211,6 +181,46 @@ function PreferencesSection() {
           <span style={{ fontSize: 13, color: 'var(--text-3)' }}>of the month</span>
         </div>
       </SettingsRow>
+    </Section>
+  );
+}
+
+// ─── 2a. Base currency ─────────────────────────────────────────────────────
+
+function BaseCurrencySection() {
+  const { prefs, updatePrefs } = usePreferences();
+  const [currencySearch, setCurrencySearch] = useState('');
+
+  const filteredCurrencies = CURRENCIES.filter(c =>
+    c.name.toLowerCase().includes(currencySearch.toLowerCase()) ||
+    c.code.toLowerCase().includes(currencySearch.toLowerCase())
+  );
+
+  return (
+    <Section icon={Coins} title="Base Currency">
+      <SettingsRow label="Base Currency" hint="Net worth, totals, budgets and charts are converted into this currency">
+        <div className="currency-picker">
+          <input
+            type="text"
+            className="currency-search"
+            placeholder="Search…"
+            value={currencySearch}
+            onChange={e => setCurrencySearch(e.target.value)}
+          />
+          <div className="currency-list">
+            {filteredCurrencies.map(c => (
+              <button key={c.code} type="button"
+                className={`currency-option ${prefs.currency === c.code ? 'active' : ''}`}
+                onClick={() => updatePrefs({ currency: c.code })}>
+                <span className="currency-symbol">{c.symbol}</span>
+                <span className="currency-name">{c.name}</span>
+                {prefs.currency === c.code && <Check size={13} strokeWidth={2} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      </SettingsRow>
+
     </Section>
   );
 }
@@ -1060,24 +1070,105 @@ function AccountSection({ logout }) {
 
 // ─── Main Settings Page ────────────────────────────────────────────────────
 
+// Settings groups: each opens its own page from the Settings menu
+const SETTINGS_PAGES = [
+  { id: 'general',       title: 'General',            icon: Palette,        desc: 'Theme, number format and budget start day' },
+  { id: 'currency',      title: 'Currency & Rates',   icon: Coins,          desc: 'Base currency and exchange rates' },
+  { id: 'categories',    title: 'Categories',         icon: Sliders,        desc: 'Hide or add categories and investment types' },
+  { id: 'notifications', title: 'Notifications',      icon: Bell,           desc: 'Install the app, push notifications and alerts' },
+  { id: 'security',      title: 'Security & Privacy', icon: Shield,         desc: 'Hide balances, PIN lock and auto-lock' },
+  { id: 'data',          title: 'Data',               icon: Database,       desc: 'Export and import your transactions' },
+  { id: 'account',       title: 'Account',            icon: User,           desc: 'Profile, sign out, reset or delete' },
+];
+
 export default function Settings({ currentUser, logout, transactions, accounts, debts, assets, addTransaction }) {
   // Expose addTransaction for the import confirm callback
   window.__addTransaction = addTransaction;
+
+  // Which group page is open (null = the menu). Each page is a browser history entry, so the
+  // phone's back gesture returns to the menu instead of leaving the app.
+  const [pageId, setPageId] = useState(null);
+  useEffect(() => {
+    const onPop = (e) => setPageId(e.state?.settingsPage || null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const openPage = (id) => {
+    window.history.pushState({ settingsPage: id }, '');
+    setPageId(id);
+    window.scrollTo(0, 0);
+  };
+  const backToMenu = () => {
+    if (window.history.state?.settingsPage) window.history.back();
+    else setPageId(null);
+    window.scrollTo(0, 0);
+  };
+
+  const page = SETTINGS_PAGES.find(p => p.id === pageId);
+
+  if (page) {
+    return (
+      <div className="settings-page">
+        <nav className="settings-crumb" aria-label="Breadcrumb">
+          <button type="button" onClick={backToMenu}>
+            <ChevronLeft size={15} strokeWidth={2} /> Settings
+          </button>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{page.title}</span>
+        </nav>
+        <div className="page-header"><h2>{page.title}</h2></div>
+        <div className="settings-layout settings-subpage">
+          {page.id === 'general'       && <PreferencesSection />}
+          {page.id === 'currency'      && (<>
+            <BaseCurrencySection />
+            <ExchangeRatesSection accounts={accounts} debts={debts} assets={assets} />
+          </>)}
+          {page.id === 'categories'    && <ManageCategoriesSection assets={assets} />}
+          {page.id === 'notifications' && <NotificationsSection />}
+          {page.id === 'security'      && <SecuritySection />}
+          {page.id === 'data'          && <DataSection transactions={transactions} accounts={accounts} />}
+          {page.id === 'account'       && (<>
+            <ProfileSection currentUser={currentUser} />
+            <AccountSection logout={logout} />
+          </>)}
+        </div>
+      </div>
+    );
+  }
+
+  const initials = (currentUser.displayName || currentUser.email || '?')
+    .split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
     <div className="settings-page">
       <div className="page-header">
         <h2>Settings</h2>
       </div>
-      <div className="settings-layout">
-        <ProfileSection currentUser={currentUser} />
-        <PreferencesSection />
-        <ExchangeRatesSection accounts={accounts} debts={debts} assets={assets} />
-        <ManageCategoriesSection assets={assets} />
-        <NotificationsSection />
-        <SecuritySection />
-        <DataSection transactions={transactions} accounts={accounts} />
-        <AccountSection logout={logout} />
+
+      {/* Who's signed in; opens the Account page */}
+      <button type="button" className="settings-profile-card" onClick={() => openPage('account')}>
+        <span className="profile-avatar-big">{initials}</span>
+        <span className="settings-profile-text">
+          <span className="settings-profile-name">{currentUser.displayName || 'Your account'}</span>
+          <span className="settings-profile-email">{currentUser.email}</span>
+        </span>
+        <ChevronRight size={18} strokeWidth={1.8} className="settings-menu-chevron" />
+      </button>
+
+      <div className="settings-menu">
+        {SETTINGS_PAGES.map(p => {
+          const Icon = p.icon;
+          return (
+            <button key={p.id} type="button" className="settings-menu-item" onClick={() => openPage(p.id)}>
+              <span className="settings-menu-icon"><Icon size={17} strokeWidth={1.7} /></span>
+              <span className="settings-menu-text">
+                <span className="settings-menu-title">{p.title}</span>
+                <span className="settings-menu-desc">{p.desc}</span>
+              </span>
+              <ChevronRight size={18} strokeWidth={1.8} className="settings-menu-chevron" />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
