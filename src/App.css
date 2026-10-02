@@ -467,7 +467,11 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(12px);
+}
+/* Blur only on wider screens: on mobile, backdrop-filter would make the header the containing
+   block for the position:fixed bottom nav, pinning the nav over the header and hiding its menu. */
+@media (min-width: 769px) {
+  .app-header { backdrop-filter: blur(12px); }
 }
 
 .header-brand {
@@ -1434,9 +1438,7 @@
 
 /* ── Tablet / large phone ──────────────────────────────── */
 @media (max-width: 768px) {
-  /* No backdrop-filter here: it makes the header the containing block for position:fixed
-     children, which pinned the bottom nav to the header and hid the header's ⋮ menu. */
-  .app-header { padding: 0 16px; height: 56px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .app-header { padding: 0 16px; height: 56px; }
   .app-main   { padding: 16px 14px calc(80px + env(safe-area-inset-bottom)); }
 
   /* ── Bottom navigation bar ── */
