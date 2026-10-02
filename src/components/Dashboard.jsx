@@ -23,7 +23,6 @@ const DONUT_PALETTE = {
   light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
 };
 const OTHER_COLOR  = { dark: '#6b7a71', light: '#9aa59f' };
-const CARD_SURFACE = { dark: '#101512', light: '#ffffff' };   // 2px gap between segments
 
 // [name, value] pairs → largest-first slices with colours; folds the tail into "Other" past 7
 function toDonutSlices(entries, theme) {
@@ -44,7 +43,7 @@ const PopBar = ({ x, y, width, height, fill, highlight }) => (
 );
 
 // Hovered/tapped donut slice "pops out": a few px further out, same colour
-const PopSlice = (props) => <Sector {...props} outerRadius={props.outerRadius + 6} />;
+const PopSlice = (props) => <Sector {...props} outerRadius={props.outerRadius + 6} stroke="none" />;
 
 // Series whose bar colour is too dark to read as text in the tooltip
 const TOOLTIP_TEXT_COLOR = { Budget: '#9cc7ad' };
@@ -111,22 +110,26 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
   }, [transactions, currentMonth]);
 
   // ── Expense breakdown (donut) ──────────────────────────────────────────
-  const expenseCategoryData = useMemo(() => {
+  const expenseCategoryKey = useMemo(() => {
     const acc = {};
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'expense')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
-    return toDonutSlices(Object.entries(acc), theme);
+    return JSON.stringify(toDonutSlices(Object.entries(acc), theme));
   }, [transactions, currentMonth, theme]);
+  // Data arrives in stages (cache, server, exchange rates); only a real change in the figures
+  // produces a new array, so the donut's animation isn't restarted and frozen mid-sweep.
+  const expenseCategoryData = useMemo(() => JSON.parse(expenseCategoryKey), [expenseCategoryKey]);
 
   // ── Savings breakdown (donut) ──────────────────────────────────────────
-  const savingsCategoryData = useMemo(() => {
+  const savingsCategoryKey = useMemo(() => {
     const acc = {};
     transactions
       .filter(t => t.date.startsWith(currentMonth) && t.type === 'savings')
       .forEach(t => { acc[t.category] = (acc[t.category] || 0) + t.baseAmount; });
-    return toDonutSlices(Object.entries(acc), theme);
+    return JSON.stringify(toDonutSlices(Object.entries(acc), theme));
   }, [transactions, currentMonth, theme]);
+  const savingsCategoryData = useMemo(() => JSON.parse(savingsCategoryKey), [savingsCategoryKey]);
 
   // ── Monthly trend (area chart) – last 6 months ─────────────────────────
   const monthlyTrend = useMemo(() => {
@@ -275,8 +278,9 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie data={expenseCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
-                    dataKey="value" paddingAngle={3} activeShape={PopSlice}>
-                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke={CARD_SURFACE[theme]} strokeWidth={2} />)}
+                    dataKey="value" paddingAngle={3} activeShape={PopSlice}
+                    stroke="none" animationBegin={0} animationDuration={500}>
+                    {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="none" />)}
                   </Pie>
                   <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>
@@ -337,8 +341,9 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie data={savingsCategoryData} cx="50%" cy="50%" innerRadius={52} outerRadius={78}
-                    dataKey="value" paddingAngle={3} activeShape={PopSlice}>
-                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke={CARD_SURFACE[theme]} strokeWidth={2} />)}
+                    dataKey="value" paddingAngle={3} activeShape={PopSlice}
+                    stroke="none" animationBegin={0} animationDuration={500}>
+                    {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="none" />)}
                   </Pie>
                   <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
                 </PieChart>
