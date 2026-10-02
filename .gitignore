@@ -28,3 +28,6 @@ dist-ssr
 firebase-debug.log
 firebase-debug.*.log
 .firebase/
+
+# Design source files (kept locally, not needed by the app)
+logos/
