@@ -2069,3 +2069,42 @@
   font-size: 14px;
   color: var(--text-1);
 }
+
+/* ─── Budget groups (Income / Expenses / Savings) ─────── */
+.budget-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.budget-group-card {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow-card);
+}
+.budget-group-card:hover  { border-color: var(--border-light); }
+.budget-group-card.active { border-color: var(--purple); box-shadow: 0 0 0 1px var(--purple) inset, var(--shadow-card); }
+.bg-head  { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bg-title { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.bg-count { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--text-3); }
+.bg-empty { font-size: 13px; color: var(--text-3); }
+.bg-figures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bg-figures > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bg-val { font-size: 14.5px; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bg-val.good { color: var(--success); }
+.bg-val.bad  { color: var(--danger); }
+.bg-progress { display: flex; align-items: center; gap: 10px; }
+.bg-progress .progress-bar-wrap { flex: 1; }
+
+@media (max-width: 900px) {
+  .budget-groups { grid-template-columns: 1fr; }
+}

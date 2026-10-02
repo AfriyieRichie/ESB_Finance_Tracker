@@ -287,7 +287,74 @@ function ExchangeRatesSection({ accounts, debts, assets }) {
 
 // ─── 3. Manage Categories ──────────────────────────────────────────────────
 
-function ManageCategoriesSection() {
+// Investment types used by "Add Investment / Asset" (built-ins are fixed; custom ones can be added/removed)
+function AssetTypesGroup({ assets = [] }) {
+  const { prefs, updatePrefs, assetTypes } = usePreferences();
+  const [adding,   setAdding]   = useState(false);
+  const [newName,  setNewName]  = useState('');
+  const [newColor, setNewColor] = useState('#6b7280');
+  const customs = prefs.customAssetTypes || [];
+
+  const add = () => {
+    const label = newName.trim();
+    if (!label) return;
+    if (assetTypes.some(t => t.label.toLowerCase() === label.toLowerCase())) return;
+    const id = `custom-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
+    updatePrefs({ customAssetTypes: [...customs, { id, label, color: newColor }] });
+    setNewName(''); setNewColor('#6b7280'); setAdding(false);
+  };
+  const remove = (id) => updatePrefs({ customAssetTypes: customs.filter(t => t.id !== id) });
+
+  return (
+    <div className="cat-manage-group">
+      <div className="cat-manage-group-header">
+        <span className="cat-manage-type-label">Investment Types</span>
+        <button type="button" className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }}
+          onClick={() => { setAdding(true); setNewName(''); }}>
+          <Plus size={12} strokeWidth={2} /> Add
+        </button>
+      </div>
+      <div className="cat-chip-list">
+        {assetTypes.map(t => {
+          const inUse = assets.filter(a => a.assetType === t.id).length;
+          return (
+            <div key={t.id} className={`cat-chip ${t.custom ? 'custom-chip' : ''}`}>
+              <span className="cat-chip-icon" style={{ width: 8, height: 8, borderRadius: '50%', background: t.color }} />
+              <span className="cat-chip-name">{t.label}</span>
+              {t.custom && (
+                <button type="button" className="cat-chip-toggle danger"
+                  disabled={inUse > 0}
+                  onClick={() => remove(t.id)}
+                  title={inUse > 0 ? `Used by ${inUse} asset${inUse > 1 ? 's' : ''}; remove or change those first` : 'Remove investment type'}>
+                  <X size={11} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {adding && (
+        <div className="cat-add-form">
+          <input type="text" placeholder="e.g. ISA, Premium Bonds, Pension" value={newName}
+            onChange={e => setNewName(e.target.value)} autoFocus />
+          <div className="cat-color-picker">
+            {COLOR_SWATCHES.map(col => (
+              <button key={col} type="button"
+                className={`color-swatch ${newColor === col ? 'selected' : ''}`}
+                style={{ background: col }} onClick={() => setNewColor(col)} />
+            ))}
+          </div>
+          <div className="cat-add-actions">
+            <button type="button" className="btn-secondary" onClick={() => setAdding(false)}>Cancel</button>
+            <button type="button" className="btn-primary" onClick={add} disabled={!newName.trim()}>Add Type</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManageCategoriesSection({ assets }) {
   const { prefs, updatePrefs } = usePreferences();
   const [addingFor, setAddingFor] = useState(null); // 'expense' | 'income' | 'savings'
   const [newName,   setNewName]   = useState('');
@@ -382,6 +449,7 @@ function ManageCategoriesSection() {
       {renderGroup('Expense', EXPENSE_CATEGORIES, 'expense')}
       {renderGroup('Income',  INCOME_CATEGORIES,  'income')}
       {renderGroup('Savings', SAVINGS_CATEGORIES, 'savings')}
+      <AssetTypesGroup assets={assets} />
     </Section>
   );
 }
@@ -909,7 +977,7 @@ export default function Settings({ currentUser, logout, transactions, accounts, 
         <ProfileSection currentUser={currentUser} />
         <PreferencesSection />
         <ExchangeRatesSection accounts={accounts} debts={debts} assets={assets} />
-        <ManageCategoriesSection />
+        <ManageCategoriesSection assets={assets} />
         <NotificationsSection />
         <SecuritySection />
         <DataSection transactions={transactions} accounts={accounts} />

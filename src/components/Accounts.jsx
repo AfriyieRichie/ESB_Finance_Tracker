@@ -8,7 +8,8 @@ import CurrencySelect, { BaseApprox } from './CurrencySelect';
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 const getAccountTypeMeta = (typeId) => ACCOUNT_TYPES.find(t => t.id === typeId) || ACCOUNT_TYPES[3];
-const getAssetTypeMeta   = (typeId) => ASSET_TYPES.find(t => t.id === typeId)   || ASSET_TYPES[7];
+// assetTypes = built-in + custom investment types from preferences
+const getAssetTypeMeta   = (assetTypes, typeId) => assetTypes.find(t => t.id === typeId) || ASSET_TYPES[7];
 
 const COLOR_SWATCHES = [
   '#e41e20','#b31012','#0072bc','#4f46e5','#0ea5e9','#7c3aed',
@@ -247,7 +248,7 @@ function DebtModal({ existing, onSave, onClose }) {
 // ─── Add Asset Modal ───────────────────────────────────────────────────────
 
 function AssetModal({ existing, accounts, onSave, onClose }) {
-  const { fmtCur, convert, baseCurrency, txFxMeta } = usePreferences();
+  const { fmtCur, convert, baseCurrency, txFxMeta, assetTypes } = usePreferences();
   const [name,       setName]       = useState(existing?.name         || '');
   const [currency,   setCurrency]   = useState(existing?.currency     || baseCurrency);
   const [assetType,  setAssetType]  = useState(existing?.assetType    || 'tbill');
@@ -283,7 +284,6 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
     onClose();
   };
 
-  const meta = getAssetTypeMeta(assetType);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -301,7 +301,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
           <div className="form-group">
             <label>Asset Type</label>
             <select value={assetType} onChange={e => setAssetType(e.target.value)}>
-              {ASSET_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              {assetTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
           <div className="form-group">
@@ -539,10 +539,10 @@ function DebtCard({ debt, onEdit, onDelete }) {
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
 function AssetCard({ asset, onUpdateValue, onCashOut, onDelete }) {
-  const { fmtCur } = usePreferences();
+  const { fmtCur, assetTypes } = usePreferences();
   const fmt = (v) => fmtCur(v, asset.currency);
   const Icon = ASSET_TYPE_ICONS[asset.assetType] || ASSET_TYPE_ICONS.other;
-  const meta = getAssetTypeMeta(asset.assetType);
+  const meta = getAssetTypeMeta(assetTypes, asset.assetType);
   const gain = asset.currentValue - asset.costBasis;
   const gainPct = asset.costBasis > 0 ? ((gain / asset.costBasis) * 100).toFixed(1) : 0;
 

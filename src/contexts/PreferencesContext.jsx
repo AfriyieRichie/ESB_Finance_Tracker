@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES } from '../hooks/useFinanceData';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES, ASSET_TYPES } from '../hooks/useFinanceData';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 
 // ─── Currency catalogue ────────────────────────────────────────────────────
@@ -34,6 +34,7 @@ const DEFAULT_PREFS = {
   autoLockTimeout:   5,         // minutes; 0 = never; -1 = immediately on blur
   hiddenCategories:  [],        // ["expense:Housing", ...]
   customCategories:  [],        // [{ type, name, icon, color }, ...]
+  customAssetTypes:  [],        // [{ id, label, color }, ...] user-defined investment types
   notifications: {
     billReminders:              true,
     budgetAlert:                true,
@@ -201,8 +202,15 @@ export function PreferencesProvider({ children, userId }) {
     };
   }, [prefs.hiddenCategories, prefs.customCategories]);
 
+  // ── Investment types (built-ins ∪ custom) ─────────────────────────────
+  const assetTypes = useMemo(
+    () => [...ASSET_TYPES, ...(prefs.customAssetTypes || []).map(t => ({ ...t, custom: true }))],
+    [prefs.customAssetTypes]
+  );
+
   const value = {
     prefs, updatePrefs, updateNotifications,
+    assetTypes,
     fmt, fmtCur, currencySymbol,
     baseCurrency, rateFor, convert, toBase, txFxMeta, setFxOverride,
     liveRates, ratesDate: fx.date, ratesLoading: fx.loading, ratesError: fx.error, refreshRates: fx.refresh,
