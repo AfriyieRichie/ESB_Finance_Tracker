@@ -18,7 +18,10 @@ function friendlyError(code) {
 
 export default function Auth() {
   const { login, signup, resetPassword } = useAuth();
-  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'reset'
+  // 'login' | 'signup' | 'reset'; the landing page links to ?mode=signup for "Get started"
+  const [mode, setMode] = useState(() =>
+    new URLSearchParams(window.location.search).get('mode') === 'signup' ? 'signup' : 'login'
+  );
 
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
