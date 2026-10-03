@@ -328,7 +328,7 @@ function CategoryDropdown({ value, onChange, categories }) {
   }, []);
 
   return (
-    <div className="cat-dropdown" ref={ref}>
+    <div className={`cat-dropdown ${open ? 'open' : ''}`} ref={ref}>
       <button className="cat-dropdown-trigger" onClick={() => setOpen(o => !o)}>
         <span className="cat-dropdown-selected">
           {value === 'All' ? (
@@ -360,6 +360,50 @@ function CategoryDropdown({ value, onChange, categories }) {
     </div>
   );
 }
+
+// Same look and behaviour as the category filter, for plain option lists (type, account)
+function FilterDropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const current = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className={`cat-dropdown ${open ? 'open' : ''}`} ref={ref}>
+      <button className="cat-dropdown-trigger" onClick={() => setOpen(o => !o)}>
+        <span className="cat-dropdown-selected">
+          <span className="cat-dropdown-label">{current.label}</span>
+        </span>
+        <ChevronDown size={13} strokeWidth={1.6} className="ico"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.18s ease' }} />
+      </button>
+      {open && (
+        <div className="cat-dropdown-menu">
+          {options.map(o => (
+            <div key={o.value} className={`cat-dropdown-item ${value === o.value ? 'active' : ''}`}
+              onClick={() => { onChange(o.value); setOpen(false); }}>
+              <span className="cat-dropdown-label" style={{ paddingLeft: 2 }}>{o.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TYPE_FILTER_OPTIONS = [
+  { value: 'All',      label: 'All Types' },
+  { value: 'income',   label: '↑ Income' },
+  { value: 'expense',  label: '↓ Expense' },
+  { value: 'savings',  label: '◆ Savings' },
+  { value: 'transfer', label: '⇄ Transfer' },
+];
 
 export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
   const { fmt, fmtCur } = usePreferences();
@@ -409,8 +453,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
     : expenseCats;
 
   // Reset category filter when type changes and current category doesn't belong to new type
-  const handleTypeChange = (e) => {
-    const newType = e.target.value;
+  const handleTypeChange = (newType) => {
     setFilterType(newType);
     if (newType !== 'All') {
       const cats = getCategoriesForType(newType);
@@ -442,17 +485,9 @@ export default function Transactions({ transactions, addTransaction, updateTrans
             onChange={e => setFilterMonth(e.target.value)} />
         </div>
         <CategoryDropdown value={filterCategory} onChange={setFilterCategory} categories={dropdownCategories} />
-        <select value={filterType} onChange={handleTypeChange}>
-          <option value="All">All Types</option>
-          <option value="income">↑ Income</option>
-          <option value="expense">↓ Expense</option>
-          <option value="savings">◆ Savings</option>
-          <option value="transfer">⇄ Transfer</option>
-        </select>
-        <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)}>
-          <option value="All">All Accounts</option>
-          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
+        <FilterDropdown value={filterType} onChange={handleTypeChange} options={TYPE_FILTER_OPTIONS} />
+        <FilterDropdown value={filterAccount} onChange={setFilterAccount}
+          options={[{ value: 'All', label: 'All Accounts' }, ...accounts.map(a => ({ value: a.id, label: a.name }))]} />
         {isFiltered && (
           <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setFilterAccount('All'); setSearch(''); }}>
             Clear filters
