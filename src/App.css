@@ -305,7 +305,7 @@
   width: 100%;
   padding: 12px;
   background: var(--purple);
-  color: #000;
+  color: var(--on-accent);
   border: none;
   border-radius: var(--radius-md);
   font-size: 14.5px;
@@ -500,9 +500,9 @@
 .nav-tab:hover { color: var(--text-1); background: var(--bg-card-alt); }
 .nav-tab.active {
   background: linear-gradient(135deg, var(--indigo), var(--purple));
-  color: #050807;
+  color: var(--on-accent);
   font-weight: 700;
-  box-shadow: 0 2px 16px rgba(0,230,118,0.35);
+  box-shadow: 0 2px 16px var(--accent-glow);
 }
 .tab-icon { font-size: 14px; }
 .tab-label { font-size: 13px; }
@@ -1447,8 +1447,8 @@
     font-size: 10px;
   }
   .header-nav .nav-tab.active {
-    background: rgba(0,230,118,0.12);
-    color: var(--accent);
+    background: var(--tab-active-bg);
+    color: var(--tab-active-fg);
     box-shadow: none;
   }
   .header-nav .tab-icon  { font-size: 17px; }
@@ -1679,7 +1679,7 @@
 }
 .seg-btn.active {
   background: var(--indigo);
-  color: #000;
+  color: var(--on-accent);
   font-weight: 700;
 }
 
@@ -2112,8 +2112,8 @@
    Only these rules set `display` on logo images, so a sizing class can't un-hide the other copy. */
 img.logo-on-dark  { display: block; }
 img.logo-on-light { display: none; }
-[data-theme="light"] img.logo-on-dark  { display: none; }
-[data-theme="light"] img.logo-on-light { display: block; }
+[data-theme="light"] img.logo-on-dark,  [data-theme="navy"] img.logo-on-dark  { display: none; }
+[data-theme="light"] img.logo-on-light, [data-theme="navy"] img.logo-on-light { display: block; }
 .brand-wordmark { height: 38px; width: auto; }
 .auth-wordmark  { height: 54px; width: auto; }
 .nudge-logo     { width: 22px; height: 22px; }
@@ -2342,3 +2342,36 @@ img.logo-on-light { display: none; }
   .auth-form-side { align-items: flex-start; padding: 0 16px 32px; }
   .auth-form-side .auth-card { margin-top: -28px; position: relative; z-index: 2; }
 }
+
+/* ─── Theme-aware icon colours (replaces fixed #c8ddd5 / #456054 in components) ─ */
+.ico        { color: var(--icon); }
+.ico-muted  { color: var(--text-3); }
+.ico-accent { color: var(--indigo); }
+
+/* ─── Navy theme: typography ─ */
+[data-theme="navy"] body,
+[data-theme="navy"] button,
+[data-theme="navy"] input,
+[data-theme="navy"] select,
+[data-theme="navy"] textarea { font-family: 'Poppins', system-ui, sans-serif; }
+[data-theme="navy"] h1, [data-theme="navy"] h2, [data-theme="navy"] h3,
+[data-theme="navy"] .auth-visual-title { font-family: 'Poppins', system-ui, sans-serif; letter-spacing: -0.3px; }
+
+/* ─── Navy theme: solid navy group tiles with white text (HodlPay-style feature cards) ─ */
+[data-theme="navy"] .group-card {
+  background: #1a1e4c;
+  border-color: #1a1e4c;
+  --text-1: #ffffff;
+  --text-2: rgba(255,255,255,0.78);
+  --text-3: rgba(255,255,255,0.6);
+  --bar-fill: #4ecdc4;
+  --border: rgba(255,255,255,0.14);
+  color: #ffffff;
+}
+[data-theme="navy"] .group-card.active { border-color: #4ecdc4; box-shadow: 0 0 0 1px #4ecdc4 inset, var(--shadow-card); }
+[data-theme="navy"] .group-card .bg-val.good { color: #4ecdc4; }
+[data-theme="navy"] .group-card .bg-val.bad  { color: #ff8a8f; }
+[data-theme="navy"] .group-card .fx-chip { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); color: #fff; }
+[data-theme="navy"] .group-card .progress-bar-wrap { background: rgba(255,255,255,0.14); }
+[data-theme="navy"] .group-card .icon-btn { color: #fff; border-color: rgba(255,255,255,0.25); background: transparent; }
+[data-theme="navy"] .auth-visual-title span { color: #4ecdc4; }

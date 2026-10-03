@@ -39,7 +39,7 @@ function Section({ icon: Icon, title, children }) {
   return (
     <div className="settings-section">
       <div className="settings-section-header">
-        <Icon size={15} strokeWidth={1.6} color="#c8ddd5" />
+        <Icon size={15} strokeWidth={1.6} className="ico" />
         <h3 className="settings-section-title">{title}</h3>
       </div>
       <div className="settings-section-body">{children}</div>
@@ -140,11 +140,11 @@ function PreferencesSection() {
       {/* Theme */}
       <SettingsRow label="Theme" hint="Controls the app's colour scheme">
         <div className="seg-control">
-          {['light','dark','system'].map(t => (
+          {[['light', '☀ Light'], ['dark', '🌙 Dark'], ['navy', '◆ Navy'], ['system', '⚙ System']].map(([t, label]) => (
             <button key={t} type="button"
               className={`seg-btn ${prefs.theme === t ? 'active' : ''}`}
               onClick={() => updatePrefs({ theme: t })}>
-              {t === 'light' ? '☀ Light' : t === 'dark' ? '🌙 Dark' : '⚙ System'}
+              {label}
             </button>
           ))}
         </div>

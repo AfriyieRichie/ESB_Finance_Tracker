@@ -24,7 +24,7 @@ export default function CategorySelect({ categories, value, onChange, disabled =
           <span className="cat-select-label">{value}</span>
         </span>
         {!disabled && (
-          <ChevronDown size={13} strokeWidth={1.6} color="#c8ddd5"
+          <ChevronDown size={13} strokeWidth={1.6} className="ico"
             style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.18s ease', flexShrink: 0 }} />
         )}
       </button>

@@ -81,7 +81,7 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
                     type="button"
                   >
                     <span className="onboarding-tile-icon">
-                      <Icon size={20} strokeWidth={1.5} color="#c8ddd5" />
+                      <Icon size={20} strokeWidth={1.5} className="ico" />
                     </span>
                     <span className="onboarding-tile-name">{acct.name}</span>
                     {isSelected && <span className="onboarding-tile-check">✓</span>}
@@ -111,7 +111,7 @@ export default function OnboardingWizard({ onComplete, onSkip }) {
                   <div key={acct.name} className="onboarding-balance-row">
                     <div className="ob-account-info">
                       <span className="ob-dot" style={{ background: acct.color }}>
-                        <Icon size={14} strokeWidth={1.5} color="#c8ddd5" />
+                        <Icon size={14} strokeWidth={1.5} className="ico" />
                       </span>
                       <span className="ob-name">{acct.name}</span>
                     </div>

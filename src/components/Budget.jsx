@@ -163,7 +163,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
 
       {monthBudgets.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon"><Wallet size={48} strokeWidth={1.2} color="#456054" /></div>
+          <div className="empty-icon"><Wallet size={48} strokeWidth={1.2} className="ico-muted" /></div>
           <h3>No budgets set</h3>
           <p>Set monthly budgets to track your spending against goals.</p>
           <button className="btn-pill" onClick={openAdd}>Add Your First Budget</button>
@@ -212,7 +212,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                       <div className="bg-progress">
                         <div className="progress-bar-wrap" style={{ height: 6 }}>
                           <div className="progress-bar-fill"
-                            style={{ width: `${Math.min(pct, 100)}%`, background: status === 'bad' ? 'var(--danger)' : '#ffffff' }} />
+                            style={{ width: `${Math.min(pct, 100)}%`, background: status === 'bad' ? 'var(--danger)' : 'var(--bar-fill)' }} />
                         </div>
                         <span className="progress-pct">{Math.round(pct)}% {g.used.toLowerCase()}</span>
                       </div>
@@ -233,7 +233,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                       const pct   = Math.min((spent / b.amount) * 100, 100);
                       const over  = spent > b.amount;
                       const warn  = pct >= 70 && !over && !g.overGood;
-                      const barColor = '#ffffff';
+                      const barColor = 'var(--bar-fill)';
 
                       return (
                         <div key={b.id} className="budget-card">
@@ -241,7 +241,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                             <div className="bc-cat">
                               <div
                                 className="bc-icon-ring"
-                                style={{ '--pct': `${pct}%`, '--ring-color': '#00a854' }}
+                                style={{ '--pct': `${pct}%`, '--ring-color': 'var(--success)' }}
                               >
                                 <div className="bc-icon-inner">
                                   <CategoryIcon name={b.category} size={19} />

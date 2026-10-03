@@ -7,7 +7,7 @@ function TypeBadge({ type }) {
   const Icon = TYPE_ICON[type] || TrendingDown;
   return (
     <span className="cat-badge">
-      <Icon size={13} strokeWidth={1.6} color="#c8ddd5" />
+      <Icon size={13} strokeWidth={1.6} className="ico" />
       {TYPE_LABEL[type] || type}
     </span>
   );
@@ -340,7 +340,7 @@ function CategoryDropdown({ value, onChange, categories }) {
             </>
           )}
         </span>
-        <ChevronDown size={13} strokeWidth={1.6} color="#c8ddd5"
+        <ChevronDown size={13} strokeWidth={1.6} className="ico"
           style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.18s ease' }} />
       </button>
       {open && (
@@ -432,12 +432,12 @@ export default function Transactions({ transactions, addTransaction, updateTrans
       {/* Filters */}
       <div className="filters-bar">
         <div className="search-wrap">
-          <Search size={15} strokeWidth={1.6} color="#c8ddd5" className="search-icon" />
+          <Search size={15} strokeWidth={1.6} className="ico search-icon" />
           <input className="search-input" type="text" placeholder="Search descriptions..."
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="date-wrap">
-          <Calendar size={15} strokeWidth={1.6} color="#c8ddd5" className="date-icon" />
+          <Calendar size={15} strokeWidth={1.6} className="ico date-icon" />
           <input className="filter-month" type="month" value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)} />
         </div>
@@ -474,7 +474,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon"><ClipboardList size={48} strokeWidth={1.2} color="#456054" /></div>
+          <div className="empty-icon"><ClipboardList size={48} strokeWidth={1.2} className="ico-muted" /></div>
           <h3>No transactions found</h3>
           <p>Try adjusting your filters or add a new transaction.</p>
         </div>
@@ -503,7 +503,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                     <td className="tx-cat">
                       {isTransfer ? (
                         <span className="cat-badge">
-                          <ArrowLeftRight size={13} strokeWidth={1.6} color="#c8ddd5" />
+                          <ArrowLeftRight size={13} strokeWidth={1.6} className="ico" />
                           {acctMap[t.fromAccountId]?.name || '?'} → {acctMap[t.toAccountId]?.name || '?'}
                         </span>
                       ) : (

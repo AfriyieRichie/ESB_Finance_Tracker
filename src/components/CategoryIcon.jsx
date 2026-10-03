@@ -55,9 +55,8 @@ export const ASSET_TYPE_ICONS = {
   other:      Package,
 };
 
-const ACCENT = '#c8ddd5';
 
 export default function CategoryIcon({ name, size = 18 }) {
   const Icon = CATEGORY_ICONS[name] || Package;
-  return <Icon size={size} strokeWidth={1.5} color={ACCENT} />;
+  return <Icon size={size} strokeWidth={1.5} className="ico" />;
 }

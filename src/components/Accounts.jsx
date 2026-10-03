@@ -575,7 +575,7 @@ function AccountCard({ account, onEdit, onDelete, onReconcile, onOpen }) {
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(account); } }}>
       <div className="acct-card-left">
         <span className="acct-icon" style={{ background: `${account.color}22`, border: `1px solid ${account.color}44` }}>
-          <Icon size={18} strokeWidth={1.5} color="#c8ddd5" />
+          <Icon size={18} strokeWidth={1.5} className="ico" />
         </span>
         <div>
           <p className="acct-name">{account.name}</p>
@@ -655,7 +655,7 @@ function AssetCard({ asset, onUpdateValue, onCashOut, onDelete }) {
       <div className="asset-card-header">
         <div className="asset-card-left">
           <span className="acct-icon" style={{ background: `${meta.color}22`, border: `1px solid ${meta.color}44` }}>
-            <Icon size={18} strokeWidth={1.5} color="#c8ddd5" />
+            <Icon size={18} strokeWidth={1.5} className="ico" />
           </span>
           <div>
             <p className="acct-name">{asset.name}</p>
@@ -899,7 +899,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
         <div className="page-header-actions">
           {accounts.length >= 2 && (
             <button className="btn-ghost" onClick={() => setModal({ type: 'transfer' })}>
-              <ArrowLeftRight size={14} strokeWidth={1.6} color="#c8ddd5" /> Transfer
+              <ArrowLeftRight size={14} strokeWidth={1.6} className="ico" /> Transfer
             </button>
           )}
           <button className="btn-pill" onClick={() => setModal({ type: 'account' })}>

@@ -35,6 +35,14 @@
   --info:    #06b6d4;        /* savings / investments accent */
   --pink:    #ec4899;
 
+  /* ── Theme-dependent extras ── */
+  --on-accent: #050807;      /* text on accent-coloured buttons */
+  --icon:      #c8ddd5;      /* default icon colour            */
+  --bar-fill:  #ffffff;      /* budget progress bars           */
+  --tab-active-bg: rgba(0,230,118,0.12);   /* phone tab bar: active tab */
+  --tab-active-fg: #00e676;
+  --accent-glow:   rgba(0,230,118,0.35);
+
   /* ── Geometry ── */
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -66,6 +74,39 @@
   --text-3:       #4a7d5e;
   --shadow-card:  0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
   --shadow-modal: 0 24px 80px rgba(0,0,0,0.18);
+  --icon:         #3d6f52;
+  --bar-fill:     #00a854;
+  --tab-active-fg: #00a854;
+}
+
+/* ─── Navy theme: light surfaces, deep navy primary, teal accents ───────── */
+[data-theme="navy"] {
+  color-scheme: light;
+  --bg-base:      #f4f4f7;
+  --bg-primary:   #ffffff;
+  --bg-card:      #ffffff;
+  --bg-card-alt:  #f0f1f6;
+  --bg-input:     #f4f4f7;
+  --border:       #e3e5ee;
+  --border-light: #c9cde0;
+  --text-1:       #14173a;
+  --text-2:       #4a4f72;
+  --text-3:       #7a7f9c;
+  --indigo:       #1a1e4c;   /* primary: buttons, active tab, highlights */
+  --indigo-l:     #4ecdc4;   /* teal accent                              */
+  --purple:       #2b3170;
+  --success:      #12a37f;
+  --danger:       #e5484d;
+  --warning:      #d97706;
+  --info:         #0e9fb0;
+  --on-accent:    #ffffff;
+  --icon:         #1a1e4c;
+  --bar-fill:     #1a1e4c;
+  --tab-active-bg: #1a1e4c;
+  --tab-active-fg: #ffffff;
+  --accent-glow:   rgba(26,30,76,0.25);
+  --shadow-card:  0 1px 2px rgba(20,23,58,0.05), 0 6px 20px rgba(20,23,58,0.06);
+  --shadow-modal: 0 24px 80px rgba(20,23,58,0.22);
 }
 
 html, body, #root {

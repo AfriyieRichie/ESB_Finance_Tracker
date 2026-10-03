@@ -290,19 +290,19 @@ function AppContent() {
           <button className="header-icon-btn desktop-only"
             title="Settings"
             onClick={() => setActiveTab('settings')}>
-            <SettingsIcon size={16} strokeWidth={1.6} color={activeTab === 'settings' ? '#00e676' : '#c8ddd5'} />
+            <SettingsIcon size={16} strokeWidth={1.6} className={activeTab === 'settings' ? 'ico-accent' : 'ico'} />
           </button>
           <button className="logout-btn desktop-only" onClick={logout} title="Sign out">⏻</button>
 
           {/* Mobile: 3-dot dropdown */}
           <div className="mobile-menu-wrap mobile-only" ref={mobileMenuRef}>
             <button className="header-icon-btn" onClick={() => setShowMobileMenu(v => !v)} title="Menu">
-              <MoreVertical size={20} strokeWidth={1.6} color="#c8ddd5" />
+              <MoreVertical size={20} strokeWidth={1.6} className="ico" />
             </button>
             {showMobileMenu && (
               <div className="mobile-dropdown">
                 <button className="mobile-dropdown-item" onClick={() => { setActiveTab('settings'); setShowMobileMenu(false); }}>
-                  <SettingsIcon size={15} strokeWidth={1.6} color="#c8ddd5" />
+                  <SettingsIcon size={15} strokeWidth={1.6} className="ico" />
                   <span>Settings</span>
                 </button>
                 <div className="mobile-dropdown-divider" />

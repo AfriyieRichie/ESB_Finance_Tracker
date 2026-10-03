@@ -7,22 +7,25 @@ import {
 import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 
-const TOOLTIP_STYLE = {
-  backgroundColor: '#101512',
-  border: '1px solid #1e2b23',
-  borderRadius: '10px',
-  color: '#eaf5ef',
-  fontSize: '13px',
+// Chart colours per theme (SVG attributes can't read CSS variables, so they're picked in JS)
+const CHART_THEME = {
+  dark:  { tick: '#7aaa8c', grid: '#1e2b23', tipBg: '#101512', tipBorder: '#1e2b23', tipText: '#eaf5ef',
+           income: '#00a854', budget: '#1e3828', budgetHi: '#2c5a3e', spent: '#00a854', spentHi: '#00e676' },
+  light: { tick: '#4a7d5e', grid: '#cdddd4', tipBg: '#ffffff', tipBorder: '#cdddd4', tipText: '#0d1a14',
+           income: '#00a854', budget: '#cfe3d6', budgetHi: '#b3d3be', spent: '#00a854', spentHi: '#008a45' },
+  navy:  { tick: '#4a4f72', grid: '#e3e5ee', tipBg: '#ffffff', tipBorder: '#e3e5ee', tipText: '#14173a',
+           income: '#12a37f', budget: '#d6d9ec', budgetHi: '#bcc1e0', spent: '#1a1e4c', spentHi: '#2b3170' },
 };
 
 // Categorical palette for donut charts: distinct hues in a fixed order, validated for colour-blind
 // separation against each theme's card surface. Past 7 categories the smallest fold into "Other"
 // (neutral grey) rather than reusing a colour.
 const DONUT_PALETTE = {
+  navy:  ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9'],
   light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7'],
 };
-const OTHER_COLOR  = { dark: '#6b7a71', light: '#9aa59f' };
+const OTHER_COLOR  = { dark: '#6b7a71', light: '#9aa59f', navy: '#9aa0b8' };
 
 // [name, value] pairs → largest-first slices with colours; folds the tail into "Other" past 7
 function toDonutSlices(entries, theme) {
@@ -45,16 +48,16 @@ const PopBar = ({ x, y, width, height, fill, highlight }) => (
 // Hovered/tapped donut slice "pops out": a few px further out, same colour
 const PopSlice = (props) => <Sector {...props} outerRadius={props.outerRadius + 6} stroke="none" />;
 
-// Series whose bar colour is too dark to read as text in the tooltip
-const TOOLTIP_TEXT_COLOR = { Budget: '#9cc7ad' };
+// Series whose bar colour is too faint to read as text in the tooltip → use the tooltip text colour
+const TOOLTIP_TEXT_COLOR = { Budget: null };
 
-const CustomTooltip = ({ active, payload, label, fmt }) => {
+const CustomTooltip = ({ active, payload, label, fmt, tipStyle }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={TOOLTIP_STYLE} className="chart-tooltip">
+    <div style={tipStyle} className="chart-tooltip">
       <p className="tooltip-label">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: TOOLTIP_TEXT_COLOR[p.name] || p.color, margin: '2px 0' }}>
+        <p key={i} style={{ color: p.name in TOOLTIP_TEXT_COLOR ? tipStyle.color : p.color, margin: '2px 0' }}>
           {p.name}: <strong>{fmt ? fmt(p.value) : p.value}</strong>
         </p>
       ))}
@@ -62,10 +65,10 @@ const CustomTooltip = ({ active, payload, label, fmt }) => {
   );
 };
 
-const PieTooltip = ({ active, payload, fmt }) => {
+const PieTooltip = ({ active, payload, fmt, tipStyle }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={TOOLTIP_STYLE} className="chart-tooltip">
+    <div style={tipStyle} className="chart-tooltip">
       <p style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span className="pie-dot" style={{ background: payload[0].payload.color }} />
         {payload[0].name}
@@ -79,7 +82,10 @@ const PieTooltip = ({ active, payload, fmt }) => {
 export default function Dashboard({ transactions, budgets, accounts, debts, assets, missingRates = [] }) {
   const { prefs, fmt, fmtCur, baseCurrency, rateFor, ratesDate } = usePreferences();
   // Effective theme ('system' is already resolved onto <html data-theme>)
-  const theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const themeAttr = document.documentElement.dataset.theme;
+  const theme = themeAttr === 'light' || themeAttr === 'navy' ? themeAttr : 'dark';
+  const ct = CHART_THEME[theme];
+  const tipStyle = { backgroundColor: ct.tipBg, border: `1px solid ${ct.tipBorder}`, borderRadius: '10px', color: ct.tipText, fontSize: '13px' };
   const hidden = prefs.hideBalances;
   const mask   = '••••••';
 
@@ -243,8 +249,8 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
             <AreaChart data={monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="gIncome"  x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#00a854" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#00a854" stopOpacity={0} />
+                  <stop offset="5%"  stopColor={ct.income} stopOpacity={0.18} />
+                  <stop offset="95%" stopColor={ct.income} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gExpense" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#f04545" stopOpacity={0.12} />
@@ -255,13 +261,13 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
                   <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} />
-              <XAxis dataKey="month" tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#7aaa8c', fontSize: 12 }} axisLine={false} tickLine={false}
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} strokeOpacity={0.6} />
+              <XAxis dataKey="month" tick={{ fill: ct.tick, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: ct.tick, fontSize: 12 }} axisLine={false} tickLine={false}
                 tickFormatter={v => v >= 1000 ? `${v/1000}k` : v} />
-              <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} />} />
-              <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '13px', paddingTop: '8px' }} />
-              <Area type="monotone" dataKey="Income"   stroke="#00a854" fill="url(#gIncome)"  strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#00a854', strokeWidth: 0 }} />
+              <Tooltip content={props => <CustomTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
+              <Legend wrapperStyle={{ color: ct.tick, fontSize: '13px', paddingTop: '8px' }} />
+              <Area type="monotone" dataKey="Income"   stroke={ct.income} fill="url(#gIncome)"  strokeWidth={2} dot={false} activeDot={{ r: 5, fill: ct.income, strokeWidth: 0 }} />
               <Area type="monotone" dataKey="Expenses" stroke="#f04545" fill="url(#gExpense)" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#f04545', strokeWidth: 0 }} />
               <Area type="monotone" dataKey="Savings"  stroke="#06b6d4" fill="url(#gSavings)" strokeWidth={2} dot={false} activeDot={{ r: 5, fill: '#06b6d4', strokeWidth: 0 }} />
             </AreaChart>
@@ -282,7 +288,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
                     stroke="none" animationBegin={0} animationDuration={500}>
                     {expenseCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="none" />)}
                   </Pie>
-                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
+                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pie-legend">
@@ -312,17 +318,17 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
               <div style={{ minWidth: budgetComparison.length * 64 }}>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={budgetComparison} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2b23" strokeOpacity={0.4} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
+                  <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} strokeOpacity={0.6} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: ct.tick, fontSize: 11 }} axisLine={false} tickLine={false}
                     angle={-35} textAnchor="end" interval={0} height={50} />
-                  <YAxis tick={{ fill: '#7aaa8c', fontSize: 11 }} axisLine={false} tickLine={false}
+                  <YAxis tick={{ fill: ct.tick, fontSize: 11 }} axisLine={false} tickLine={false}
                     tickFormatter={v => v >= 1000 ? `${v/1000}k` : `${v}`} width={36} />
-                  <Tooltip cursor={false} content={props => <CustomTooltip {...props} fmt={fmt} />} />
-                  <Legend wrapperStyle={{ color: '#7aaa8c', fontSize: '12px', paddingTop: '4px' }} />
-                  <Bar dataKey="budget" name="Budget" fill="#1e3828" radius={[6,6,0,0]} maxBarSize={36}
-                    activeBar={props => <PopBar {...props} highlight="#2c5a3e" />} />
-                  <Bar dataKey="spent"  name="Spent"  fill="#00a854" radius={[6,6,0,0]} maxBarSize={36}
-                    activeBar={props => <PopBar {...props} highlight="#00e676" />} />
+                  <Tooltip cursor={false} content={props => <CustomTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
+                  <Legend wrapperStyle={{ color: ct.tick, fontSize: '12px', paddingTop: '4px' }} />
+                  <Bar dataKey="budget" name="Budget" fill={ct.budget} radius={[6,6,0,0]} maxBarSize={36}
+                    activeBar={props => <PopBar {...props} highlight={ct.budgetHi} />} />
+                  <Bar dataKey="spent"  name="Spent"  fill={ct.spent} radius={[6,6,0,0]} maxBarSize={36}
+                    activeBar={props => <PopBar {...props} highlight={ct.spentHi} />} />
                 </BarChart>
               </ResponsiveContainer>
               </div>
@@ -345,7 +351,7 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
                     stroke="none" animationBegin={0} animationDuration={500}>
                     {savingsCategoryData.map((e, i) => <Cell key={i} fill={e.color} stroke="none" />)}
                   </Pie>
-                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} />} />
+                  <Tooltip content={props => <PieTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pie-legend">
