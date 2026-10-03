@@ -2451,3 +2451,21 @@ img.logo-on-light { display: none; }
 /* Theme picker: wraps onto two rows when there isn't room for every option */
 .seg-control.seg-wrap { flex-wrap: wrap; }
 .seg-control.seg-wrap .seg-btn { flex: 1 0 auto; }
+
+/* Drop-down menus must be solid and on top: in Sapphire the card surface is see-through glass,
+   so menus get their own opaque surface (themes with solid cards are unaffected) */
+.cat-dropdown-menu, .cat-select-menu, .mobile-dropdown { background: var(--menu-bg, var(--bg-card)); z-index: 400; }
+.cat-dropdown.open, .cat-dropdown:focus-within { z-index: 401; }
+.cat-dropdown { z-index: 5; }
+[data-theme="sapphire"] {
+  --menu-bg: #121b63;
+}
+[data-theme="sapphire"] .cat-dropdown-menu,
+[data-theme="sapphire"] .cat-select-menu,
+[data-theme="sapphire"] .mobile-dropdown {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 50px rgba(0, 0, 20, 0.6);
+}
+[data-theme="sapphire"] .cat-dropdown-item:hover,
+[data-theme="sapphire"] .cat-select-item:hover,
+[data-theme="sapphire"] .mobile-dropdown-item:hover { background: rgba(255, 255, 255, 0.10); }
