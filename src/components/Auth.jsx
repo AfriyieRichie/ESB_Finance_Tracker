@@ -76,7 +76,20 @@ export default function Auth() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-split">
+      {/* Photo side (left on wide screens, banner on phones). Photo: Unsplash, free licence. */}
+      <aside className="auth-visual" aria-hidden="true">
+        <picture>
+          <source media="(max-width: 899px)" srcSet="/auth/signin-photo-wide.webp" />
+          <img src="/auth/signin-photo.webp" alt="" />
+        </picture>
+        <div className="auth-visual-copy">
+          <p className="auth-visual-title">Budget, save and grow your money, <span>in any currency.</span></p>
+          <p className="auth-visual-sub">All your accounts, budgets and savings in one clear view.</p>
+        </div>
+      </aside>
+
+      <div className="auth-form-side">
       <div className="auth-card">
 
         {/* Brand */}
@@ -194,6 +207,7 @@ export default function Auth() {
             {mode === 'login' ? 'Create one' : 'Sign in'}
           </button>
         </p>}
+      </div>
       </div>
     </div>
   );
