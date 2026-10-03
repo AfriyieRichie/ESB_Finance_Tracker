@@ -10,13 +10,13 @@ import CategoryIcon from './CategoryIcon';
 // Chart colours per theme (SVG attributes can't read CSS variables, so they're picked in JS)
 const CHART_THEME = {
   dark:  { tick: '#7aaa8c', grid: '#1e2b23', tipBg: '#101512', tipBorder: '#1e2b23', tipText: '#eaf5ef',
-           income: '#00a854', budget: '#1e3828', budgetHi: '#2c5a3e', spent: '#00a854', spentHi: '#00e676' },
+           income: '#00a854', budget: '#26302a', budgetHi: '#2c5a3e', spent: '#00a854', spentHi: '#00e676', over: '#e5484d' },
   light: { tick: '#4a7d5e', grid: '#cdddd4', tipBg: '#ffffff', tipBorder: '#cdddd4', tipText: '#0d1a14',
-           income: '#00a854', budget: '#cfe3d6', budgetHi: '#b3d3be', spent: '#00a854', spentHi: '#008a45' },
+           income: '#00a854', budget: '#dde3df', budgetHi: '#b3d3be', spent: '#00a854', spentHi: '#008a45', over: '#00582c' },
   sapphire: { tick: 'rgba(214,224,255,0.7)', grid: 'rgba(255,255,255,0.10)', tipBg: 'rgba(14,22,80,0.95)', tipBorder: 'rgba(255,255,255,0.18)', tipText: '#ffffff',
-           income: '#2ee6a8', budget: 'rgba(255,255,255,0.18)', budgetHi: 'rgba(255,255,255,0.32)', spent: '#8fb0ff', spentHi: '#c3d3ff' },
+           income: '#2ee6a8', budget: 'rgba(255,255,255,0.16)', budgetHi: 'rgba(255,255,255,0.32)', spent: '#8fb0ff', spentHi: '#c3d3ff', over: '#ff5c7a' },
   navy:  { tick: '#4a4f72', grid: '#e3e5ee', tipBg: '#ffffff', tipBorder: '#e3e5ee', tipText: '#14173a',
-           income: '#12a37f', budget: '#d6d9ec', budgetHi: '#bcc1e0', spent: '#1a1e4c', spentHi: '#2b3170' },
+           income: '#12a37f', budget: '#dcdfec', budgetHi: '#bcc1e0', spent: '#3a4190', spentHi: '#2b3170', over: '#0d1033' },
 };
 
 // Categorical palette for donut charts: distinct hues in a fixed order, validated for colour-blind
@@ -41,12 +41,27 @@ function toDonutSlices(entries, theme) {
   return slices;
 }
 
-// Hovered bar "pops out": slightly wider and taller, brighter, with a soft outline
-const PopBar = ({ x, y, width, height, fill, highlight }) => (
-  <Rectangle x={x - 3} y={y - 4} width={width + 6} height={height + 4}
-    radius={[7, 7, 0, 0]} fill={highlight || fill}
-    stroke="rgba(234,245,239,0.35)" strokeWidth={1} />
+// Budget vs Actual: one bar per budget. Grey track = budget; spending fills it from the bottom;
+// any overspend sits on top in a darker colour. Only the topmost segment gets rounded corners.
+const topSegment = d => (d.over > 0 ? 'over' : d.remaining > 0 ? 'remaining' : 'within');
+const segmentShape = key => props => (
+  <Rectangle {...props} radius={topSegment(props.payload) === key ? [6, 6, 0, 0] : 0} />
 );
+
+const BudgetTooltip = ({ active, payload, label, fmt, tipStyle }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div style={tipStyle} className="chart-tooltip">
+      <p className="tooltip-label">{d.full || label}</p>
+      <p style={{ margin: '2px 0' }}>Budget: <strong>{fmt(d.budget)}</strong></p>
+      <p style={{ margin: '2px 0' }}>Spent: <strong>{fmt(d.spent)}</strong></p>
+      <p style={{ margin: '2px 0' }}>
+        {d.over > 0 ? 'Over by' : 'Left'}: <strong>{fmt(d.over > 0 ? d.over : d.remaining)}</strong>
+      </p>
+    </div>
+  );
+};
 
 // Hovered/tapped donut slice "pops out": a few px further out, same colour
 const PopSlice = (props) => <Sector {...props} outerRadius={props.outerRadius + 6} stroke="none" />;
@@ -164,7 +179,12 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
         .reduce((s, t) => s + t.baseAmount, 0);
       // Short label: first word only, max 8 chars
       const label = b.category.split(' & ')[0].split(' ')[0].slice(0, 8);
-      return { name: label, budget: b.amount, spent };
+      return {
+        name: label, full: b.category, budget: b.amount, spent,
+        within:    Math.min(spent, b.amount),
+        remaining: Math.max(b.amount - spent, 0),
+        over:      Math.max(spent - b.amount, 0),
+      };
     });
   }, [transactions, budgets, currentMonth]);
 
@@ -326,12 +346,17 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
                     angle={-35} textAnchor="end" interval={0} height={50} />
                   <YAxis tick={{ fill: ct.tick, fontSize: 11 }} axisLine={false} tickLine={false}
                     tickFormatter={v => v >= 1000 ? `${v/1000}k` : `${v}`} width={36} />
-                  <Tooltip cursor={false} content={props => <CustomTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
-                  <Legend wrapperStyle={{ color: ct.tick, fontSize: '12px', paddingTop: '4px' }} />
-                  <Bar dataKey="budget" name="Budget" fill={ct.budget} radius={[6,6,0,0]} maxBarSize={36}
-                    activeBar={props => <PopBar {...props} highlight={ct.budgetHi} />} />
-                  <Bar dataKey="spent"  name="Spent"  fill={ct.spent} radius={[6,6,0,0]} maxBarSize={36}
-                    activeBar={props => <PopBar {...props} highlight={ct.spentHi} />} />
+                  <Tooltip cursor={false} content={props => <BudgetTooltip {...props} fmt={fmt} tipStyle={tipStyle} />} />
+                  <Legend content={() => (
+                    <div className="bva-legend">
+                      {[['Budget', ct.budget], ['Spent', ct.spent], ['Over budget', ct.over]].map(([label, color]) => (
+                        <span key={label} style={{ color: ct.tick }}><i style={{ background: color }} />{label}</span>
+                      ))}
+                    </div>
+                  )} />
+                  <Bar dataKey="within"    stackId="b" name="Spent"       fill={ct.spent}  maxBarSize={40} shape={segmentShape('within')} />
+                  <Bar dataKey="remaining" stackId="b" name="Budget left" fill={ct.budget} maxBarSize={40} shape={segmentShape('remaining')} />
+                  <Bar dataKey="over"      stackId="b" name="Over budget" fill={ct.over}   maxBarSize={40} shape={segmentShape('over')} />
                 </BarChart>
               </ResponsiveContainer>
               </div>

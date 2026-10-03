@@ -48,7 +48,7 @@ export function demoData() {
   const budgets = [
     { id: 'b1', type: 'expense', category: 'Food & Dining',  amount: 300,  month },
     { id: 'b2', type: 'expense', category: 'Housing',        amount: 650,  month },
-    { id: 'b3', type: 'expense', category: 'Transportation', amount: 80,   month },
+    { id: 'b3', type: 'expense', category: 'Transportation', amount: 50,   month },
     { id: 'b4', type: 'expense', category: 'Entertainment',  amount: 30,   month },
     { id: 'b5', type: 'income',  category: 'Salary',         amount: 2400, month },
     { id: 'b6', type: 'savings', category: 'Emergency Fund', amount: 400,  month },
