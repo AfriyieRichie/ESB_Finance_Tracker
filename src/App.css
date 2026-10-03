@@ -2379,3 +2379,10 @@ img.logo-on-light { display: none; }
 
 /* Account history: room for the full date next to the calendar icon on phones */
 @media (max-width: 600px) { .activity-range input { padding: 8px 6px 8px 10px; } }
+
+/* Account history: on phones From / To each get a full row so native date pickers can't overflow */
+@media (max-width: 600px) {
+  .activity-range { grid-template-columns: minmax(0, 1fr); }
+  .activity-range label:last-child { grid-column: auto; }
+  .activity-range input, .activity-range select { width: 100%; max-width: 100%; display: block; }
+}

@@ -145,40 +145,49 @@ export function useFinanceData(userId) {
   const [loading,      setLoading]      = useState(!demo);
   // True once the server (not just the offline cache) has confirmed the accounts list
   const [accountsConfirmed, setAccountsConfirmed] = useState(!!demo);
+  // 'error' if a listener failed (with its code), 'slow' if loading passed the time limit
+  const [loadIssue, setLoadIssue] = useState(null);
 
   useEffect(() => {
     if (!userId || DEMO) return;
 
+    setLoadIssue(null);
     const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false };
-    const checkDone = () => { if (Object.values(loaded).every(Boolean)) setLoading(false); };
+    const checkDone = () => { if (Object.values(loaded).every(Boolean)) { clearTimeout(slowTimer); setLoading(false); } };
 
-    const unsubTx = onSnapshot(
-      collection(db, 'users', userId, 'transactions'),
-      snap => { setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() }))); loaded.tx = true; checkDone(); }
-    );
-    const unsubBudgets = onSnapshot(
-      collection(db, 'users', userId, 'budgets'),
-      snap => { setBudgets(snap.docs.map(d => ({ type: 'expense', ...d.data(), id: d.id }))); loaded.budgets = true; checkDone(); }
-    );
-    const unsubAccounts = onSnapshot(
-      collection(db, 'users', userId, 'accounts'),
-      { includeMetadataChanges: true },
-      snap => {
-        setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        if (!snap.metadata.fromCache) setAccountsConfirmed(true);
-        loaded.accounts = true; checkDone();
+    // A failed listener must still count as "done", otherwise the spinner never stops
+    const listen = (key, name, opts, onData) => onSnapshot(
+      collection(db, 'users', userId, name), opts,
+      snap => { onData(snap); loaded[key] = true; checkDone(); },
+      err => {
+        console.error(`Loading ${name} failed:`, err);
+        setLoadIssue({ kind: 'error', code: err.code || 'unknown', what: name });
+        loaded[key] = true; checkDone();
       }
     );
-    const unsubDebts = onSnapshot(
-      collection(db, 'users', userId, 'debts'),
-      snap => { setDebts(snap.docs.map(d => ({ id: d.id, ...d.data() }))); loaded.debts = true; checkDone(); }
-    );
-    const unsubAssets = onSnapshot(
-      collection(db, 'users', userId, 'assets'),
-      snap => { setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() }))); loaded.assets = true; checkDone(); }
-    );
 
-    return () => { unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); };
+    // Slow or blocked connection: show what we have instead of waiting forever
+    const slowTimer = setTimeout(() => {
+      if (!Object.values(loaded).every(Boolean)) {
+        setLoadIssue(prev => prev || { kind: 'slow' });
+        setLoading(false);
+      }
+    }, 12000);
+
+    const unsubTx = listen('tx', 'transactions', {},
+      snap => setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubBudgets = listen('budgets', 'budgets', {},
+      snap => setBudgets(snap.docs.map(d => ({ type: 'expense', ...d.data(), id: d.id }))));
+    const unsubAccounts = listen('accounts', 'accounts', { includeMetadataChanges: true }, snap => {
+      setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      if (!snap.metadata.fromCache) setAccountsConfirmed(true);
+    });
+    const unsubDebts = listen('debts', 'debts', {},
+      snap => setDebts(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubAssets = listen('assets', 'assets', {},
+      snap => setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); };
   }, [userId]);
 
   // ── Transactions ────────────────────────────────────────────────────────
@@ -451,7 +460,7 @@ export function useFinanceData(userId) {
   }, [userId]);
 
   return {
-    transactions, budgets, accounts, debts, assets, loading, accountsConfirmed,
+    transactions, budgets, accounts, debts, assets, loading, accountsConfirmed, loadIssue,
     addTransaction, updateTransaction, deleteTransaction,
     addTransfer,
     upsertBudget, deleteBudget,

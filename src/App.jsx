@@ -116,7 +116,7 @@ function AppContent() {
   }, [showMobileMenu]);
 
   const {
-    transactions: rawTransactions, budgets, accounts: rawAccounts, debts: rawDebts, assets: rawAssets, loading, accountsConfirmed,
+    transactions: rawTransactions, budgets, accounts: rawAccounts, debts: rawDebts, assets: rawAssets, loading, accountsConfirmed, loadIssue,
     addTransaction, updateTransaction, deleteTransaction, addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
@@ -341,6 +341,17 @@ function AppContent() {
             <button className="nudge-cta" onClick={async () => { if (await install.promptInstall()) dismissInstall(); }}>Install</button>
           )}
           <button className="nudge-dismiss" onClick={dismissInstall} title="Dismiss">✕</button>
+        </div>
+      )}
+
+      {loadIssue && (
+        <div className="nudge-banner load-issue">
+          <div className="nudge-text">
+            {loadIssue.kind === 'error'
+              ? <><strong>Couldn't load your {loadIssue.what}.</strong><span> Reason: {loadIssue.code}. Check your connection and try again.</span></>
+              : <><strong>Still syncing your data…</strong><span> Your connection seems slow. Showing what's saved on this device.</span></>}
+          </div>
+          <button className="nudge-cta" onClick={() => window.location.reload()}>Retry</button>
         </div>
       )}
 
