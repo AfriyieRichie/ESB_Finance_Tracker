@@ -42,6 +42,11 @@ export default defineConfig({
       },
       workbox: {
         importScripts: ['push-sw.js'],   // push + notification-click handlers
+        // New versions activate immediately AND take over open pages, so the app's auto-reload
+        // fires and nobody is left running an old cached copy
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         runtimeCaching: [
           {

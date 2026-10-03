@@ -138,3 +138,41 @@ button, input, select, textarea {
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: var(--border-light); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ─── Sapphire theme: vivid blue fading into deep navy, frosted-glass surfaces ── */
+[data-theme="sapphire"] {
+  color-scheme: dark;
+  --bg-base:      #060920;
+  --bg-primary:   rgba(10, 16, 58, 0.55);
+  --bg-card:      rgba(255, 255, 255, 0.07);
+  --bg-card-alt:  rgba(255, 255, 255, 0.11);
+  --bg-input:     rgba(255, 255, 255, 0.08);
+  --border:       rgba(255, 255, 255, 0.10);
+  --border-light: rgba(255, 255, 255, 0.20);
+  --text-1:       #ffffff;
+  --text-2:       rgba(226, 232, 255, 0.78);
+  --text-3:       rgba(200, 210, 255, 0.55);
+  --indigo:       #ffffff;   /* primary buttons / active tab are white with dark-blue text */
+  --indigo-l:     #8fb0ff;
+  --purple:       #e8edff;
+  --success:      #2ee6a8;
+  --danger:       #ff6b8a;
+  --warning:      #ffc24b;
+  --info:         #7aa2ff;
+  --on-accent:    #0b1557;
+  --icon:         #dbe4ff;
+  --bar-fill:     #8fb0ff;
+  --tab-active-bg: rgba(255, 255, 255, 0.16);
+  --tab-active-fg: #ffffff;
+  --accent-glow:  rgba(120, 150, 255, 0.35);
+  --radius-lg:    22px;
+  --radius-xl:    28px;
+  --shadow-card:  0 10px 30px rgba(0, 0, 20, 0.35);
+  --shadow-modal: 0 30px 90px rgba(0, 0, 25, 0.7);
+}
+[data-theme="sapphire"] body {
+  background:
+    radial-gradient(1100px 600px at 50% -120px, #3a63ff 0%, rgba(58, 99, 255, 0.55) 35%, transparent 70%),
+    linear-gradient(180deg, #1b2fb8 0%, #0d1660 28%, #070b2e 55%, #050716 100%);
+  background-attachment: fixed;
+}

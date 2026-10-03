@@ -139,8 +139,8 @@ function PreferencesSection() {
     <Section icon={Palette} title="Preferences">
       {/* Theme */}
       <SettingsRow label="Theme" hint="Controls the app's colour scheme">
-        <div className="seg-control">
-          {[['light', '☀ Light'], ['dark', '🌙 Dark'], ['navy', '◆ Navy'], ['system', '⚙ System']].map(([t, label]) => (
+        <div className="seg-control seg-wrap">
+          {[['light', '☀ Light'], ['dark', '🌙 Dark'], ['navy', '◆ Navy'], ['sapphire', '💎 Sapphire'], ['system', '⚙ System']].map(([t, label]) => (
             <button key={t} type="button"
               className={`seg-btn ${prefs.theme === t ? 'active' : ''}`}
               onClick={() => updatePrefs({ theme: t })}>

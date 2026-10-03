@@ -2386,3 +2386,68 @@ img.logo-on-light { display: none; }
   .activity-range label:last-child { grid-column: auto; }
   .activity-range input, .activity-range select { width: 100%; max-width: 100%; display: block; }
 }
+
+/* ─── Sapphire: frosted glass ─────────────────────────── */
+[data-theme="sapphire"] body,
+[data-theme="sapphire"] button, [data-theme="sapphire"] input,
+[data-theme="sapphire"] select, [data-theme="sapphire"] textarea { font-family: 'Inter', system-ui, sans-serif; }
+[data-theme="sapphire"] h1, [data-theme="sapphire"] h2, [data-theme="sapphire"] h3 { font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.4px; }
+[data-theme="sapphire"] .stat-card,
+[data-theme="sapphire"] .chart-card,
+[data-theme="sapphire"] .acct-card,
+[data-theme="sapphire"] .debt-card,
+[data-theme="sapphire"] .asset-card,
+[data-theme="sapphire"] .budget-card,
+[data-theme="sapphire"] .group-card,
+[data-theme="sapphire"] .net-worth-hero,
+[data-theme="sapphire"] .settings-section,
+[data-theme="sapphire"] .settings-menu,
+[data-theme="sapphire"] .settings-profile-card,
+[data-theme="sapphire"] .tx-table-wrap,
+[data-theme="sapphire"] .modal,
+[data-theme="sapphire"] .auth-card {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: var(--shadow-card);
+}
+[data-theme="sapphire"] .modal { background: rgba(14, 22, 80, 0.86); }
+[data-theme="sapphire"] .app-header { background: transparent; border-bottom-color: transparent; }
+[data-theme="sapphire"] .header-nav { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.12); }
+[data-theme="sapphire"] .nav-tab.active { color: #0b1557; }
+[data-theme="sapphire"] .group-card.active { border-color: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, var(--shadow-card); }
+[data-theme="sapphire"] .group-panel .acct-card,
+[data-theme="sapphire"] .group-panel .debt-card,
+[data-theme="sapphire"] .group-panel .asset-card,
+[data-theme="sapphire"] .group-panel .budget-card { background: rgba(4, 8, 40, 0.45); }
+/* round icon buttons, pill buttons */
+[data-theme="sapphire"] .icon-btn,
+[data-theme="sapphire"] .header-icon-btn { border-radius: 50%; background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.14); }
+[data-theme="sapphire"] .btn-primary, [data-theme="sapphire"] .btn-ghost,
+[data-theme="sapphire"] .btn-secondary, [data-theme="sapphire"] .btn-pill { border-radius: 999px; }
+[data-theme="sapphire"] .btn-primary { background: #ffffff; color: #0b1557; }
+[data-theme="sapphire"] .auth-split .auth-form-side { background: transparent; }
+[data-theme="sapphire"] .auth-visual-title span { color: #8fb0ff; }
+
+/* phones: floating frosted tab bar */
+@media (max-width: 768px) {
+  [data-theme="sapphire"] .header-nav {
+    left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom));
+    border-radius: 30px; padding: 6px;
+    background: rgba(20, 28, 90, 0.55); border: 1px solid rgba(255, 255, 255, 0.14);
+    -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+    box-shadow: 0 12px 40px rgba(0, 0, 20, 0.5);
+  }
+  [data-theme="sapphire"] .header-nav .nav-tab { border-radius: 24px; }
+  [data-theme="sapphire"] .app-main { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+}
+
+/* Sapphire: let the gradient on <body> show through the page containers */
+[data-theme="sapphire"] .app,
+[data-theme="sapphire"] .auth-page,
+[data-theme="sapphire"] .onboarding-overlay { background: transparent; }
+
+/* Theme picker: wraps onto two rows when there isn't room for every option */
+.seg-control.seg-wrap { flex-wrap: wrap; }
+.seg-control.seg-wrap .seg-btn { flex: 1 0 auto; }
