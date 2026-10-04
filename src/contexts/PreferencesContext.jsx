@@ -197,7 +197,7 @@ export function PreferencesProvider({ children, userId }) {
   // ── Currency & exchange rates ──────────────────────────────────────────
   const baseCurrency   = prefs.currency;
   const currencySymbol = symbolFor(baseCurrency);
-  const fx             = useExchangeRates(baseCurrency);
+  const fx             = useExchangeRates(baseCurrency, DEMO ? null : userId);
   const liveRates      = fx.rates;
   const fxOverrides    = prefs.fxOverrides;
 
