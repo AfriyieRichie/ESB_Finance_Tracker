@@ -6,7 +6,11 @@ const SOURCES = [
   base => `https://latest.currency-api.pages.dev/v1/currencies/${base}.json`,
 ];
 
-const MAX_AGE_MS = 12 * 60 * 60 * 1000;
+// Rates are published once a day (each response carries its date). Every device refreshes as soon
+// as its saved rates are from before today, checking at most hourly, and never swaps a newer day's
+// rates for an older copy, so all devices converge on the same published rate.
+const RECHECK_MS = 60 * 60 * 1000;
+const todayUTC   = () => new Date().toISOString().slice(0, 10);
 const NO_RATES   = {};
 const cacheKey   = base => `fx-rates-${base}`;
 
@@ -51,12 +55,18 @@ export function useExchangeRates(base) {
   const load = useCallback(async (force = false) => {
     const cached = readCache(base);
     setEntry(cached);
-    if (!force && cached && Date.now() - cached.fetchedAt < MAX_AGE_MS) return;
+    const upToDate  = cached?.date && cached.date >= todayUTC();
+    const checkedRecently = cached && Date.now() - cached.fetchedAt < RECHECK_MS;
+    if (!force && cached && (upToDate || checkedRecently)) return;
     setLoading(true); setError('');
     try {
       const fresh = await fetchRates(base);
-      writeCache(base, fresh);
-      setEntry(fresh);
+      if (cached?.date && fresh.date && fresh.date < cached.date) {
+        writeCache(base, { ...cached, fetchedAt: Date.now() });   // got an older copy; keep ours
+      } else {
+        writeCache(base, fresh);
+        setEntry(fresh);
+      }
     } catch {
       setError('Could not fetch live exchange rates. Using last saved rates.');
     } finally {
