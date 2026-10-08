@@ -2533,3 +2533,16 @@ select optgroup {
 /* Loan cash-in */
 .tx-amount.loan, .recent-amount.loan { color: var(--text-1); }
 .loan-receipt { border-top: 1px dashed var(--border-light); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Pop-up windows never grow past the screen: their contents scroll inside them
+   (dvh follows the visible height on phones, vh is the fallback) */
+.modal {
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 600px) {
+  .modal { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); }
+}
