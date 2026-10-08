@@ -166,27 +166,34 @@ function DebtModal({ existing, accounts = [], transactions = [], onSave, onClose
   const [recvDate,  setRecvDate]  = useState(today);
   const [name,     setName]     = useState(existing?.name           || '');
   const [currency, setCurrency] = useState(existing?.currency       || baseCurrency);
-  const [original, setOriginal] = useState(existing?.originalAmount || '');
+  const [principal, setPrincipal] = useState(existing?.principal ?? '');   // cash actually borrowed
+  const [original, setOriginal] = useState(existing?.originalAmount || '');   // total to repay incl. interest
   const [current,  setCurrent]  = useState(existing?.currentBalance || '');
-  const [rate,     setRate]     = useState(existing?.interestRate   || '');
+  // An auto-computed rate stays automatic when editing (so it follows changes to the amounts)
+  const [rate,     setRate]     = useState(existing?.interestAuto ? '' : (existing?.interestRate || ''));
   const [payment,  setPayment]  = useState(existing?.monthlyPayment || '');
   const [dueDate,  setDueDate]  = useState(existing?.dueDate        || '');
   const [notes,    setNotes]    = useState(existing?.notes          || '');
   const [busy,     setBusy]     = useState(false);
 
   // Pre-fill the amount received from the loan amount, converted into the account's currency
-  const suggestRecv = (acctId) => {
+  const suggestRecv = (acctId, borrowed = principal) => {
     const acct = accounts.find(a => a.id === acctId);
-    const amt  = parseFloat(original) || parseFloat(current) || 0;
+    const amt  = parseFloat(borrowed) || parseFloat(original) || parseFloat(current) || 0;
     if (!acct || !amt) return '';
     const v = acct.currency === currency ? amt : convert(amt, currency, acct.currency);
     return v === null ? '' : String(Math.round(v * 100) / 100);
   };
   const recvAccount = accounts.find(a => a.id === recvAcct);
+  // Overall interest rate worked out from borrowed vs total to repay (used if no rate is typed)
+  const autoRate = parseFloat(principal) > 0 && parseFloat(original) > parseFloat(principal)
+    ? Math.round(((parseFloat(original) - parseFloat(principal)) / parseFloat(principal)) * 1000) / 10
+    : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !current) return;
+    const owed = parseFloat(current) || parseFloat(original);   // a new loan defaults to the total to repay
+    if (!name.trim() || !owed) return;
     const amount  = parseFloat(recvAmt);
     const receipt = recvAccount && amount > 0
       ? { accountId: recvAcct, amount, date: recvDate, fx: txFxMeta(recvAccount.currency) }
@@ -196,8 +203,10 @@ function DebtModal({ existing, accounts = [], transactions = [], onSave, onClose
       name:           name.trim(),
       currency,
       originalAmount: parseFloat(original) || parseFloat(current),
-      currentBalance: parseFloat(current),
-      interestRate:   parseFloat(rate)    || null,
+      principal:      parseFloat(principal) || null,
+      currentBalance: owed,
+      interestRate:   parseFloat(rate) || autoRate || null,
+      interestAuto:   !parseFloat(rate) && !!autoRate,
       monthlyPayment: parseFloat(payment) || null,
       dueDate:        dueDate || null,
       notes:          notes.trim() || null,
@@ -224,20 +233,34 @@ function DebtModal({ existing, accounts = [], transactions = [], onSave, onClose
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label>Original Amount ({symbolFor(currency)})</label>
+              <label>Amount Borrowed ({symbolFor(currency)})</label>
+              <input type="number" min="0" step="0.01" placeholder="Cash you received"
+                value={principal} onChange={e => {
+                  setPrincipal(e.target.value);
+                  if (!recvTouched && recvAcct) setRecvAmt(suggestRecv(recvAcct, e.target.value));
+                }} />
+            </div>
+            <div className="form-group">
+              <label>Total to Repay, incl. Interest ({symbolFor(currency)})</label>
               <input type="number" min="0" step="0.01" placeholder="0.00"
                 value={original} onChange={e => setOriginal(e.target.value)} />
             </div>
-            <div className="form-group">
-              <label>Amount Still Owed ({symbolFor(currency)})</label>
-              <input type="number" min="0" step="0.01" placeholder="0.00"
-                value={current} onChange={e => setCurrent(e.target.value)} required />
-            </div>
+          </div>
+          {parseFloat(principal) > 0 && parseFloat(original) > parseFloat(principal) && (
+            <p className="fx-hint">
+              Interest: {fmtCur(parseFloat(original) - parseFloat(principal), currency)}
+              {' '}({(((parseFloat(original) - parseFloat(principal)) / parseFloat(principal)) * 100).toFixed(1)}% of the amount borrowed)
+            </p>
+          )}
+          <div className="form-group">
+            <label>Amount Still Owed ({symbolFor(currency)})</label>
+            <input type="number" min="0" step="0.01" placeholder={original ? `${original} (same as total to repay)` : '0.00'}
+              value={current} onChange={e => setCurrent(e.target.value)} required={!original} />
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>Interest Rate % (optional)</label>
-              <input type="number" min="0" step="0.1" placeholder="e.g. 18.5"
+              <input type="number" min="0" step="0.1" placeholder={autoRate ? `${autoRate} (auto)` : 'e.g. 18.5'}
                 value={rate} onChange={e => setRate(e.target.value)} />
             </div>
             <div className="form-group">
@@ -683,7 +706,7 @@ function PaidDebtCard({ debt, transactions, onDelete }) {
         </div>
       </div>
       <div className="bg-figures">
-        <div><span className="bs-label">Borrowed</span><span className="bg-val">{fmt(debt.originalAmount || 0)}</span></div>
+        <div><span className="bs-label">Borrowed</span><span className="bg-val">{fmt(debt.principal || debt.originalAmount || 0)}</span></div>
         <div><span className="bs-label">Repaid</span><span className="bg-val">{h.count ? fmt(h.totalRepaid) : '—'}</span></div>
         <div><span className="bs-label">Repayments</span><span className="bg-val">{h.count || '—'}</span></div>
       </div>
@@ -703,7 +726,10 @@ function DebtCard({ debt, onEdit, onDelete }) {
       <div className="debt-card-header">
         <div>
           <p className="debt-name">{debt.name}</p>
-          {debt.interestRate && <p className="debt-meta">{debt.interestRate}% interest{debt.dueDate ? ` · Due ${debt.dueDate}` : ''}</p>}
+          {debt.principal > 0 && debt.originalAmount > debt.principal && (
+            <p className="debt-meta">Borrowed {fmt(debt.principal)} · Interest {fmt(debt.originalAmount - debt.principal)}</p>
+          )}
+          {debt.interestRate && <p className="debt-meta">{debt.interestRate}% interest{debt.interestAuto ? ' (overall)' : ''}{debt.dueDate ? ` · Due ${debt.dueDate}` : ''}</p>}
         </div>
         <div className="acct-actions">
           <button className="icon-btn" onClick={() => onEdit(debt)} title="Edit"><Pencil size={13} strokeWidth={1.6} /></button>
