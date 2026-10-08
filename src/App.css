@@ -2505,3 +2505,11 @@ img.logo-on-light { display: none; }
 .proj-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px;
   border-radius: 999px; background: var(--bg-card-alt); border: 1px solid var(--border); color: var(--text-2); margin-left: 6px; white-space: nowrap; }
 .proj-badge i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+/* Native drop-down lists (<select> options) can't be see-through: give every option a solid,
+   themed surface so text stays readable in all themes (Sapphire's inputs are translucent glass) */
+select option,
+select optgroup {
+  background-color: var(--menu-bg, var(--bg-card));
+  color: var(--text-1);
+}
