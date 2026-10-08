@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
+import { newestFirst } from '../txOrder';
 
 // Chart colours per theme (SVG attributes can't read CSS variables, so they're picked in JS)
 const CHART_THEME = {
@@ -191,7 +192,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
 
   // ── Recent 6 transactions ─────────────────────────────────────────────
   const recentTransactions = useMemo(() =>
-    [...(allTransactions || transactions)].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6),
+    [...(allTransactions || transactions)].sort(newestFirst).slice(0, 6),
     [allTransactions, transactions]
   );
 

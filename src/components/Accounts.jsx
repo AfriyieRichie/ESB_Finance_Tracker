@@ -7,6 +7,7 @@ import CurrencySelect, { BaseApprox } from './CurrencySelect';
 import { ProjectCard, ProjectFormModal, ProjectDetailModal } from './Projects';
 import { projectStats } from '../projects';
 import { isPaidOff, repaymentHistory } from '../debts';
+import { newestFirst, oldestFirst } from '../txOrder';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -568,7 +569,7 @@ function AccountActivityModal({ account, accounts, transactions, onClose }) {
       }
       return { ...t, signed: (t.type === 'income' || t.type === 'loan') ? t.amount : -t.amount, detail: t.category };
     })
-    .sort((a, b) => sort === 'newest' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+    .sort(sort === 'newest' ? newestFirst : oldestFirst);
 
   const moneyIn  = rows.filter(r => r.signed > 0).reduce((s, r) => s + r.signed, 0);
   const moneyOut = rows.filter(r => r.signed < 0).reduce((s, r) => s - r.signed, 0);

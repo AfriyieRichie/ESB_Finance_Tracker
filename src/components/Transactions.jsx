@@ -16,6 +16,7 @@ import { usePreferences, useEffectiveCategoriesForType, symbolFor } from '../con
 import { BaseApprox } from './CurrencySelect';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
+import { newestFirst } from '../txOrder';
 
 function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, projects = [], addTransfer, budgets, existing }) {
   const { fmtCur, convert, txFxMeta } = usePreferences();
@@ -469,7 +470,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
         if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+      .sort(newestFirst);
   }, [transactions, filterMonth, filterCategory, filterType, filterAccount, filterProject, search]);
 
   // Totals in the base currency

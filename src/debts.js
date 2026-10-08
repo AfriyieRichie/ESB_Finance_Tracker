@@ -1,3 +1,5 @@
+import { oldestFirst } from './txOrder';
+
 // Debts & loans: a debt is "paid off" once nothing is owed. Paid-off debts move to the history.
 
 export const isPaidOff = (d) => (Number(d.currentBalance) || 0) <= 0.005;
@@ -6,7 +8,7 @@ export const isPaidOff = (d) => (Number(d.currentBalance) || 0) <= 0.005;
 export function repaymentHistory(debt, transactions) {
   const reps = transactions
     .filter(t => t.debtId === debt.id && t.type !== 'transfer')
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort(oldestFirst);
   const totalRepaid = reps.reduce((s, t) => s + (t.debtAmount ?? t.amount ?? 0), 0);
   const first = reps[0]?.date || null;
   const last  = reps[reps.length - 1]?.date || null;

@@ -1,6 +1,8 @@
 // Business / side projects: transactions tagged with a projectId are tracked against the project
 // and kept out of personal spending, budgets and dashboard figures (they still move account balances).
 
+import { newestFirst } from './txOrder';
+
 export const PROJECT_COLORS = ['#3b82f6', '#00b85a', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#ef4444', '#6b7280'];
 
 export const isPersonal = (t) => !t.projectId;
@@ -26,7 +28,7 @@ export function projectStats(project, transactions, fx = {}) {
 
   const txs = transactions
     .filter(t => t.projectId === project.id && t.type !== 'transfer')
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort(newestFirst);
   let putIn = 0, earned = 0, putInBase = 0, earnedBase = 0;
   const byCategory = {};
   for (const t of txs) {

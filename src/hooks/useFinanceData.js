@@ -221,7 +221,7 @@ export function useFinanceData(userId) {
 
     // Write transaction
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
-    batch.set(txRef, t);
+    batch.set(txRef, { ...t, loggedAt: t.loggedAt ?? Date.now() });   // keeps same-day order
 
     // Update account balance
     const delta = isInflow(t) ? t.amount : -t.amount;
@@ -284,6 +284,7 @@ export function useFinanceData(userId) {
 
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
     batch.set(txRef, {
+      loggedAt: Date.now(),
       ...meta,
       type:          'transfer',
       description:   description || 'Transfer',
@@ -334,6 +335,7 @@ export function useFinanceData(userId) {
   const writeLoanReceipt = useCallback((batch, debtId, debtName, receipt) => {
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
     batch.set(txRef, {
+      loggedAt: Date.now(),
       ...(receipt.fx || {}),
       type:        'loan',
       description: `Loan received: ${debtName}`,
@@ -388,6 +390,7 @@ export function useFinanceData(userId) {
       const txRef = doc(collection(db, 'users', userId, 'transactions'));
       const paid  = sourceAmount ?? asset.costBasis;
       batch.set(txRef, {
+      loggedAt: Date.now(),
         ...txMeta,
         description: `Investment: ${asset.name}`,
         amount:      paid,
@@ -429,6 +432,7 @@ export function useFinanceData(userId) {
 
     const txRef = doc(collection(db, 'users', userId, 'transactions'));
     batch.set(txRef, {
+      loggedAt: Date.now(),
       ...txMeta,
       description: `Cash out: ${asset.name}`,
       amount:      receivedAmount,
