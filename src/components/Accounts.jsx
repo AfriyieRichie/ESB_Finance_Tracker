@@ -1033,6 +1033,25 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
             </div>
           )}
         </GroupTile>
+        {openGroup === 'assets' && (
+          <div className="group-panel">
+            {activeAssets.length === 0 ? (
+              <p className="accounts-empty">No assets tracked yet. Add a treasury bill, property, or any investment.</p>
+            ) : (
+              <div className="asset-grid">
+                {activeAssets.map(a => (
+                  <AssetCard
+                    key={a.id}
+                    asset={a}
+                    onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
+                    onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
+                    onDelete={deleteAsset}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {/* ── Projects (businesses / side projects) ── */}
         <GroupTile id="projects" open={openGroup === 'projects'} onToggle={toggle} title="Projects"
           count={activeProjects.length} noun="project"
@@ -1059,26 +1078,6 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
                 {[...activeProjects, ...projects.filter(p => p.status === 'closed')].map(p => (
                   <ProjectCard key={p.id} project={p} transactions={transactions}
                     onOpen={proj => setModal({ type: 'project', data: proj })} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {openGroup === 'assets' && (
-          <div className="group-panel">
-            {activeAssets.length === 0 ? (
-              <p className="accounts-empty">No assets tracked yet. Add a treasury bill, property, or any investment.</p>
-            ) : (
-              <div className="asset-grid">
-                {activeAssets.map(a => (
-                  <AssetCard
-                    key={a.id}
-                    asset={a}
-                    onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
-                    onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
-                    onDelete={deleteAsset}
-                  />
                 ))}
               </div>
             )}
