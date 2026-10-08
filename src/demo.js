@@ -49,6 +49,7 @@ export function demoData() {
     tx('t17', 12, 'Company registration', 50, 'expense', 'Registration & Licences', 'a1', { projectId: 'p1' }),
     tx('t18', 6, 'Instagram ads', 120, 'expense', 'Marketing & Ads', 'a1', { projectId: 'p1' }),
     tx('t19', 2, 'First client payment', 380, 'income', 'Sales', 'a1', { projectId: 'p1' }),
+    tx('t20', 1, 'Packaging from Makola', 450, 'expense', 'Stock / Inventory', 'a3', { projectId: 'p1' }),
   ];
   const budgets = [
     { id: 'b1', type: 'expense', category: 'Food & Dining',  amount: 300,  month },
@@ -66,7 +67,7 @@ export function demoData() {
     { id: 's2', name: 'Index fund', assetType: 'stocks', currency: 'GBP', costBasis: 1200, currentValue: 1310, status: 'active' },
   ];
   const projects = [
-    { id: 'p1', name: 'Online store', startDate: day(25), budget: 2000, color: '#3b82f6', status: 'active', notes: 'Handmade accessories' },
+    { id: 'p1', name: 'Online store', currency: 'GHS', startDate: day(25), budget: 25000, color: '#3b82f6', status: 'active', notes: 'Handmade accessories' },
   ];
   return { accounts, transactions, budgets, debts, assets, projects };
 }

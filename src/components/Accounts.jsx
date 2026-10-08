@@ -894,7 +894,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
   const activeProjects = projects.filter(p => p.status !== 'closed');
   const projTotals = projects.reduce((t, p) => {
     const st = projectStats(p, transactions);
-    return { putIn: t.putIn + st.putIn, earned: t.earned + st.earned, net: t.net + st.net };
+    return { putIn: t.putIn + st.putInBase, earned: t.earned + st.earnedBase, net: t.net + st.netBase };
   }, { putIn: 0, earned: 0, net: 0 });
 
   // Which group's items are showing; all collapsed at first

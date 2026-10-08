@@ -2513,3 +2513,8 @@ select optgroup {
   background-color: var(--menu-bg, var(--bg-card));
   color: var(--text-1);
 }
+
+/* Project figures can be long (e.g. GH₵ amounts): wrap instead of cutting off */
+.proj-card .bg-val { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
+.proj-summary b { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .proj-card .bg-val { font-size: 13.5px; } .proj-summary b { font-size: 15px; } }

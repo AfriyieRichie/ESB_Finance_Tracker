@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Trash2, Briefcase } from 'lucide-react';
-import { usePreferences } from '../contexts/PreferencesContext';
+import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
+import CurrencySelect from './CurrencySelect';
 import { projectStats, PROJECT_COLORS } from '../projects';
 import CategoryIcon from './CategoryIcon';
 
@@ -8,7 +9,8 @@ const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { d
 
 // Net position line: profit, or how far from breaking even
 function NetLine({ s }) {
-  const { fmt } = usePreferences();
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, s.currency);
   if (s.putIn === 0 && s.earned === 0) return <span className="proj-net">No transactions yet</span>;
   return s.net >= 0
     ? <span className="proj-net good">In profit by {fmt(s.net)}</span>
@@ -17,9 +19,17 @@ function NetLine({ s }) {
 
 // ─── Card shown under the Projects tile ───────────────────────────────────
 
+// "≈ £12.30" under a figure when the project isn't in the base currency
+function BaseLine({ value, s }) {
+  const { fmt, baseCurrency } = usePreferences();
+  if (s.currency === baseCurrency) return null;
+  return <span className="fx-approx">≈ {fmt(value)}</span>;
+}
+
 export function ProjectCard({ project, transactions, onOpen }) {
-  const { fmt } = usePreferences();
-  const s = projectStats(project, transactions);
+  const { fmtCur, baseCurrency, convert } = usePreferences();
+  const s = projectStats(project, transactions, { baseCurrency, convert });
+  const fmt = (v) => fmtCur(v, s.currency);
   return (
     <div className="proj-card" role="button" tabIndex={0} onClick={() => onOpen(project)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(project); } }}>
@@ -28,13 +38,13 @@ export function ProjectCard({ project, transactions, onOpen }) {
         <div className="proj-title">
           <p className="acct-name">{project.name}</p>
           <p className="acct-type">
-            {project.status === 'closed' ? 'Closed' : 'Active'} · since {fmtDate(project.startDate)} · {s.txs.length} transaction{s.txs.length === 1 ? '' : 's'}
+            {project.status === 'closed' ? 'Closed' : 'Active'} · {s.currency} · since {fmtDate(project.startDate)} · {s.txs.length} transaction{s.txs.length === 1 ? '' : 's'}
           </p>
         </div>
       </div>
       <div className="bg-figures">
-        <div><span className="bs-label">Put in</span><span className="bg-val">{fmt(s.putIn)}</span></div>
-        <div><span className="bs-label">Earned</span><span className="bg-val">{fmt(s.earned)}</span></div>
+        <div><span className="bs-label">Put in</span><span className="bg-val">{fmt(s.putIn)}</span><BaseLine value={s.putInBase} s={s} /></div>
+        <div><span className="bs-label">Earned</span><span className="bg-val">{fmt(s.earned)}</span><BaseLine value={s.earnedBase} s={s} /></div>
         <div><span className="bs-label">Net</span><span className={`bg-val ${s.net >= 0 ? 'good' : 'bad'}`}>{s.net >= 0 ? '+' : '−'}{fmt(Math.abs(s.net))}</span></div>
       </div>
       {s.budgetPct !== null && (
@@ -53,7 +63,8 @@ export function ProjectCard({ project, transactions, onOpen }) {
 // ─── Add / edit project ───────────────────────────────────────────────────
 
 export function ProjectFormModal({ existing, onSave, onClose }) {
-  const { currencySymbol } = usePreferences();
+  const { baseCurrency } = usePreferences();
+  const [currency,  setCurrency]  = useState(existing?.currency || baseCurrency);
   const today = new Date().toISOString().slice(0, 10);
   const [name,      setName]      = useState(existing?.name || '');
   const [startDate, setStartDate] = useState(existing?.startDate || today);
@@ -66,7 +77,7 @@ export function ProjectFormModal({ existing, onSave, onClose }) {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
-    await onSave({ name: name.trim(), startDate, budget: parseFloat(budget) || null, notes: notes.trim() || null, color });
+    await onSave({ name: name.trim(), currency, startDate, budget: parseFloat(budget) || null, notes: notes.trim() || null, color });
     onClose();
   };
 
@@ -87,13 +98,18 @@ export function ProjectFormModal({ existing, onSave, onClose }) {
             <input type="text" placeholder="e.g. My new business" value={name}
               onChange={e => setName(e.target.value)} autoFocus required />
           </div>
+          <div className="form-group">
+            <label>Project currency</label>
+            <CurrencySelect value={currency} onChange={setCurrency} />
+            <p className="fx-hint">The project's totals and budget are shown in this currency.</p>
+          </div>
           <div className="form-row">
             <div className="form-group">
               <label>Start date</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Startup budget ({currencySymbol}, optional)</label>
+              <label>Startup budget ({symbolFor(currency)}, optional)</label>
               <input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={budget}
                 onChange={e => setBudget(e.target.value)} />
             </div>
@@ -124,9 +140,10 @@ export function ProjectFormModal({ existing, onSave, onClose }) {
 // ─── Project detail ───────────────────────────────────────────────────────
 
 export function ProjectDetailModal({ project, transactions, accounts, onEdit, onToggleStatus, onDelete, onClose }) {
-  const { fmt, fmtCur } = usePreferences();
+  const { fmtCur, baseCurrency, convert } = usePreferences();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const s = projectStats(project, transactions);
+  const s = projectStats(project, transactions, { baseCurrency, convert });
+  const fmt = (v) => fmtCur(v, s.currency);
   const acctName = (id) => accounts.find(a => a.id === id)?.name || 'deleted account';
   const maxCat = s.categories[0]?.[1] || 1;
 
@@ -139,15 +156,15 @@ export function ProjectDetailModal({ project, transactions, accounts, onEdit, on
               <span className="proj-dot" style={{ background: project.color }} />{project.name}
             </h3>
             <p className="acct-type" style={{ marginTop: 2 }}>
-              {project.status === 'closed' ? 'Closed' : 'Active'} · since {fmtDate(project.startDate)}{project.notes ? ` · ${project.notes}` : ''}
+              {project.status === 'closed' ? 'Closed' : 'Active'} · {s.currency} · since {fmtDate(project.startDate)}{project.notes ? ` · ${project.notes}` : ''}
             </p>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
         <div className="proj-summary">
-          <div><span className="bs-label">Put in</span><b>{fmt(s.putIn)}</b></div>
-          <div><span className="bs-label">Earned</span><b>{fmt(s.earned)}</b></div>
+          <div><span className="bs-label">Put in</span><b>{fmt(s.putIn)}</b><BaseLine value={s.putInBase} s={s} /></div>
+          <div><span className="bs-label">Earned</span><b>{fmt(s.earned)}</b><BaseLine value={s.earnedBase} s={s} /></div>
           <div><span className="bs-label">Net</span><b className={s.net >= 0 ? 'pos' : 'neg'}>{s.net >= 0 ? '+' : '−'}{fmt(Math.abs(s.net))}</b></div>
         </div>
         <NetLine s={s} />
