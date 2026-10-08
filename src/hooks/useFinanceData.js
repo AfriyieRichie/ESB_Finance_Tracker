@@ -150,6 +150,8 @@ const ASSET_TYPE_TO_CATEGORY = {
 // Amounts linked to a debt/asset are stored in that debt's/asset's currency when it differs
 // from the paying account's (debtAmount / assetAmount); otherwise the tx amount applies.
 const debtAmt  = t => t.debtAmount  ?? t.amount;
+// Money coming into an account: income, or cash received from a new loan ('loan', not income)
+const isInflow = t => t.type === 'income' || t.type === 'loan';
 const assetAmt = t => t.assetAmount ?? t.amount;
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
@@ -171,7 +173,6 @@ export function useFinanceData(userId) {
   useEffect(() => {
     if (!userId || DEMO) return;
 
-    setLoadIssue(null);
     const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false, projects: false };
     const checkDone = () => { if (Object.values(loaded).every(Boolean)) { clearTimeout(slowTimer); setLoading(false); } };
 
@@ -223,7 +224,7 @@ export function useFinanceData(userId) {
     batch.set(txRef, t);
 
     // Update account balance
-    const delta = t.type === 'income' ? t.amount : -t.amount;
+    const delta = isInflow(t) ? t.amount : -t.amount;
     batch.update(doc(db, 'users', userId, 'accounts', t.accountId), { balance: increment(delta) });
 
     // If debt repayment, reduce debt balance
@@ -256,7 +257,7 @@ export function useFinanceData(userId) {
     } else {
       // Reverse account balance for regular transactions
       if (tx.accountId) {
-        const delta = tx.type === 'income' ? -tx.amount : tx.amount;
+        const delta = isInflow(tx) ? -tx.amount : tx.amount;
         batch.update(doc(db, 'users', userId, 'accounts', tx.accountId), { balance: increment(delta) });
       }
       // Reverse debt reduction
@@ -328,9 +329,41 @@ export function useFinanceData(userId) {
 
   // ── Debts ───────────────────────────────────────────────────────────────
 
-  const addDebt = useCallback(async (debt) => {
-    await whenSaved(addDoc(collection(db, 'users', userId, 'debts'), debt));
+  // Cash received from a loan: credits the account and records a 'loan' transaction (not income,
+  // so it stays out of income totals and budgets). receipt = { accountId, amount, date, fx }
+  const writeLoanReceipt = useCallback((batch, debtId, debtName, receipt) => {
+    const txRef = doc(collection(db, 'users', userId, 'transactions'));
+    batch.set(txRef, {
+      ...(receipt.fx || {}),
+      type:        'loan',
+      description: `Loan received: ${debtName}`,
+      amount:      receipt.amount,
+      category:    'Loan received',
+      date:        receipt.date,
+      accountId:   receipt.accountId,
+      loanDebtId:  debtId,
+    });
+    batch.update(doc(db, 'users', userId, 'accounts', receipt.accountId), { balance: increment(receipt.amount) });
   }, [userId]);
+
+  const addDebt = useCallback(async (debt, receipt) => {
+    if (!receipt) {
+      await whenSaved(addDoc(collection(db, 'users', userId, 'debts'), debt));
+      return;
+    }
+    const batch   = writeBatch(db);
+    const debtRef = doc(collection(db, 'users', userId, 'debts'));
+    batch.set(debtRef, debt);
+    writeLoanReceipt(batch, debtRef.id, debt.name, receipt);
+    await whenSaved(batch.commit());
+  }, [userId, writeLoanReceipt]);
+
+  // Record the cash-in for a loan that was added earlier
+  const recordLoanReceipt = useCallback(async (debt, receipt) => {
+    const batch = writeBatch(db);
+    writeLoanReceipt(batch, debt.id, debt.name, receipt);
+    await whenSaved(batch.commit());
+  }, [writeLoanReceipt]);
 
   const updateDebt = useCallback(async (id, updates) => {
     await whenSaved(updateDoc(doc(db, 'users', userId, 'debts', id), updates));
@@ -471,7 +504,7 @@ export function useFinanceData(userId) {
       const oldType  = original.type;
       const newType  = updates.type || original.type;
 
-      const effect = (type, amt) => type === 'income' ? amt : -amt;
+      const effect = (type, amt) => (type === 'income' || type === 'loan') ? amt : -amt;
 
       if (oldAccId === newAccId) {
         const delta = effect(newType, newAmt) - effect(oldType, oldAmt);
@@ -512,7 +545,7 @@ export function useFinanceData(userId) {
     addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
-    addDebt, updateDebt, deleteDebt,
+    addDebt, updateDebt, deleteDebt, recordLoanReceipt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     addProject, updateProject, deleteProject,
     getSpending,

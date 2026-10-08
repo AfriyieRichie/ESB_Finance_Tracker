@@ -2529,3 +2529,7 @@ select optgroup {
 .history-toggle.open .bg-chevron { transform: rotate(90deg); }
 .paid-debt { opacity: 0.9; }
 .paid-debt .debt-name { color: var(--success); }
+
+/* Loan cash-in */
+.tx-amount.loan, .recent-amount.loan { color: var(--text-1); }
+.loan-receipt { border-top: 1px dashed var(--border-light); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }

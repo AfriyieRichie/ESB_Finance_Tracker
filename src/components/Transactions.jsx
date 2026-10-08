@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight, Pencil } from 'lucide-react';
+import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight, Pencil, HandCoins } from 'lucide-react';
 
-const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight };
-const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer' };
+const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight, loan: HandCoins };
+const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer', loan: 'Loan received' };
 function TypeBadge({ type }) {
   const Icon = TYPE_ICON[type] || TrendingDown;
   return (
@@ -430,6 +430,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'expense',  label: '↓ Expense' },
   { value: 'savings',  label: '◆ Savings' },
   { value: 'transfer', label: '⇄ Transfer' },
+  { value: 'loan',     label: '⤓ Loan received' },
 ];
 
 export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, projects = [], addTransfer, budgets }) {
@@ -476,7 +477,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.baseAmount, 0);
   const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0);
 
-  const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
+  const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '', loan: '+' };
 
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || filterAccount !== 'All' || filterProject !== 'All' || search;
 
@@ -600,7 +601,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                         : <BaseApprox amount={t.amount} currency={t.currency} />}
                     </td>
                     <td className="tx-actions">
-                      {!isTransfer && (
+                      {!isTransfer && t.type !== 'loan' && (
                         <button className="icon-btn edit-btn" onClick={() => setEditingTx(t)} title="Edit">
                           <Pencil size={13} strokeWidth={1.6} />
                         </button>

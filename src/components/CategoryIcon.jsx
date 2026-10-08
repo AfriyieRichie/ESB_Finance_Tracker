@@ -3,7 +3,7 @@ import {
   BookOpen, Sparkles, Package, Briefcase, TrendingUp,
   Landmark, Building2, Laptop, Shield, BarChart2, Bitcoin,
   CreditCard, Lock, Users, PieChart, Smartphone, Banknote, Wallet,
-  Monitor, Boxes, Megaphone, AppWindow, FileBadge, Scale, Store, Plane, Receipt, ShoppingCart, Handshake,
+  HandCoins, Monitor, Boxes, Megaphone, AppWindow, FileBadge, Scale, Store, Plane, Receipt, ShoppingCart, Handshake,
 } from 'lucide-react';
 
 const CATEGORY_ICONS = {
@@ -35,6 +35,7 @@ const CATEGORY_ICONS = {
   'Cryptocurrency':  Bitcoin,
   'Real Estate':     Home,
   'Mutual Funds':    TrendingUp,
+  'Loan received':  HandCoins,
   // Business (project) costs
   'Equipment':                Monitor,
   'Stock / Inventory':        Boxes,

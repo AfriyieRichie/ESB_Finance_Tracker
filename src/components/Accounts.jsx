@@ -155,8 +155,15 @@ function ReconcileModal({ account, onSave, onClose }) {
 
 // ─── Add / Edit Debt Modal ─────────────────────────────────────────────────
 
-function DebtModal({ existing, onSave, onClose }) {
-  const { baseCurrency } = usePreferences();
+function DebtModal({ existing, accounts = [], transactions = [], onSave, onClose }) {
+  const { baseCurrency, convert, fmtCur, txFxMeta } = usePreferences();
+  const today = new Date().toISOString().slice(0, 10);
+  // Cash-in: optional for a new loan, or for an existing one that has none recorded yet
+  const receivedTx  = existing ? transactions.find(t => t.loanDebtId === existing.id) : null;
+  const [recvAcct,  setRecvAcct]  = useState('');
+  const [recvAmt,   setRecvAmt]   = useState('');
+  const [recvTouched, setRecvTouched] = useState(false);
+  const [recvDate,  setRecvDate]  = useState(today);
   const [name,     setName]     = useState(existing?.name           || '');
   const [currency, setCurrency] = useState(existing?.currency       || baseCurrency);
   const [original, setOriginal] = useState(existing?.originalAmount || '');
@@ -167,9 +174,23 @@ function DebtModal({ existing, onSave, onClose }) {
   const [notes,    setNotes]    = useState(existing?.notes          || '');
   const [busy,     setBusy]     = useState(false);
 
+  // Pre-fill the amount received from the loan amount, converted into the account's currency
+  const suggestRecv = (acctId) => {
+    const acct = accounts.find(a => a.id === acctId);
+    const amt  = parseFloat(original) || parseFloat(current) || 0;
+    if (!acct || !amt) return '';
+    const v = acct.currency === currency ? amt : convert(amt, currency, acct.currency);
+    return v === null ? '' : String(Math.round(v * 100) / 100);
+  };
+  const recvAccount = accounts.find(a => a.id === recvAcct);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !current) return;
+    const amount  = parseFloat(recvAmt);
+    const receipt = recvAccount && amount > 0
+      ? { accountId: recvAcct, amount, date: recvDate, fx: txFxMeta(recvAccount.currency) }
+      : null;
     setBusy(true);
     await onSave({
       name:           name.trim(),
@@ -180,7 +201,7 @@ function DebtModal({ existing, onSave, onClose }) {
       monthlyPayment: parseFloat(payment) || null,
       dueDate:        dueDate || null,
       notes:          notes.trim() || null,
-    });
+    }, receipt);
     onClose();
   };
 
@@ -236,6 +257,40 @@ function DebtModal({ existing, onSave, onClose }) {
             <input type="text" placeholder="e.g. Loan from a family member"
               value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
+
+          {receivedTx ? (
+            <p className="fx-hint">
+              ✓ Cash received: {fmtCur(receivedTx.amount, receivedTx.currency)} into{' '}
+              {accounts.find(a => a.id === receivedTx.accountId)?.name || 'an account'} on {receivedTx.date}.
+            </p>
+          ) : accounts.length > 0 && (
+            <div className="loan-receipt">
+              <div className="form-group">
+                <label>Money received into (optional)</label>
+                <select value={recvAcct} onChange={e => {
+                  setRecvAcct(e.target.value);
+                  if (!recvTouched) setRecvAmt(suggestRecv(e.target.value));
+                }}>
+                  <option value="">— Not recorded —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}
+                </select>
+                <p className="fx-hint">Adds the loan money to that account. It is not counted as income.</p>
+              </div>
+              {recvAccount && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Amount received ({symbolFor(recvAccount.currency)})</label>
+                    <input type="number" min="0.01" step="0.01" value={recvAmt}
+                      onChange={e => { setRecvAmt(e.target.value); setRecvTouched(true); }} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Date received</label>
+                    <input type="date" value={recvDate} onChange={e => setRecvDate(e.target.value)} required />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={busy}>
@@ -488,7 +543,7 @@ function AccountActivityModal({ account, accounts, transactions, onClose }) {
           detail: incoming ? `Transfer from ${acctName(t.fromAccountId)}` : `Transfer to ${acctName(t.toAccountId)}`,
         };
       }
-      return { ...t, signed: t.type === 'income' ? t.amount : -t.amount, detail: t.category };
+      return { ...t, signed: (t.type === 'income' || t.type === 'loan') ? t.amount : -t.amount, detail: t.category };
     })
     .sort((a, b) => sort === 'newest' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
 
@@ -897,7 +952,7 @@ function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, 
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -1175,9 +1230,12 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
       )}
       {modal?.type === 'debt' && (
         <DebtModal
-          existing={modal.data}
+          existing={modal.data} accounts={accounts} transactions={transactions}
           onSave={modal.data
-            ? (updates) => updateDebt(modal.data.id, updates)
+            ? async (updates, receipt) => {
+                await updateDebt(modal.data.id, updates);
+                if (receipt) await recordLoanReceipt({ ...modal.data, ...updates }, receipt);
+              }
             : addDebt}
           onClose={close}
         />
