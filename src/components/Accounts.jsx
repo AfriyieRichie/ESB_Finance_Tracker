@@ -6,6 +6,7 @@ import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
 import CurrencySelect, { BaseApprox } from './CurrencySelect';
 import { ProjectCard, ProjectFormModal, ProjectDetailModal } from './Projects';
 import { projectStats } from '../projects';
+import { isPaidOff, repaymentHistory } from '../debts';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -604,6 +605,37 @@ function AccountCard({ account, onEdit, onDelete, onReconcile, onOpen }) {
 
 // ─── Debt Card ─────────────────────────────────────────────────────────────
 
+// Paid-off debt in the history list
+function PaidDebtCard({ debt, transactions, onDelete }) {
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, debt.currency);
+  const h = repaymentHistory(debt, transactions);
+  const when = debt.paidOffDate
+    ? new Date(debt.paidOffDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  return (
+    <div className="debt-card paid-debt">
+      <div className="debt-card-header">
+        <div>
+          <p className="debt-name">✓ {debt.name}</p>
+          <p className="debt-meta">
+            Paid off{when ? ` on ${when}` : ''}
+            {h.months !== null && h.count > 1 ? ` · took ${h.months === 0 ? 'under a month' : `${h.months} month${h.months === 1 ? '' : 's'}`}` : ''}
+          </p>
+        </div>
+        <div className="acct-actions">
+          <button className="icon-btn delete-btn" onClick={() => onDelete(debt.id)} title="Delete from history"><Trash2 size={13} strokeWidth={1.6} /></button>
+        </div>
+      </div>
+      <div className="bg-figures">
+        <div><span className="bs-label">Borrowed</span><span className="bg-val">{fmt(debt.originalAmount || 0)}</span></div>
+        <div><span className="bs-label">Repaid</span><span className="bg-val">{h.count ? fmt(h.totalRepaid) : '—'}</span></div>
+        <div><span className="bs-label">Repayments</span><span className="bg-val">{h.count || '—'}</span></div>
+      </div>
+    </div>
+  );
+}
+
 function DebtCard({ debt, onEdit, onDelete }) {
   const { fmtCur } = usePreferences();
   const fmt = (v) => fmtCur(v, debt.currency);
@@ -838,7 +870,7 @@ function TransferModal({ accounts, onTransfer, onClose }) {
 
 // ─── Group tile (Cash / Debts / Investments): summary that expands its items ─
 
-function GroupTile({ id, title, count, noun, open, onToggle, onAdd, addTitle, children }) {
+function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, addTitle, children }) {
   return (
     <div className={`group-card ${open ? 'active' : ''}`} role="button" tabIndex={0}
       aria-expanded={open}
@@ -848,7 +880,7 @@ function GroupTile({ id, title, count, noun, open, onToggle, onAdd, addTitle, ch
         <span className="bg-title">{title}</span>
         <span className="bg-head-right">
           <span className="bg-count">
-            {count} {count === 1 ? noun : `${noun}s`}
+            {countLabel || `${count} ${count === 1 ? noun : `${noun}s`}`}
             <ChevronRight size={13} strokeWidth={1.8} className="bg-chevron" />
           </span>
           <button type="button" className="icon-btn bg-add" title={addTitle}
@@ -872,7 +904,10 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
 
   // ── Totals per group, in the base currency ────────────────────────────
   const activeAssets = assets.filter(a => a.status === 'active');
-  const openDebts    = debts.filter(d => d.status !== 'paid');
+  const openDebts    = debts.filter(d => !isPaidOff(d));
+  const paidDebts    = debts.filter(isPaidOff)
+    .sort((a, b) => (b.paidOffDate || '').localeCompare(a.paidOffDate || ''));
+  const [showPaidDebts, setShowPaidDebts] = useState(false);
   const base = (amount, cur) => toBase(amount || 0, cur) ?? 0;
 
   const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
@@ -978,9 +1013,10 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
 
         {/* ── Debts & Loans ── */}
         <GroupTile id="debts" open={openGroup === 'debts'} onToggle={toggle} title="Debts & Loans" count={openDebts.length} noun="debt"
+          countLabel={paidDebts.length ? `${openDebts.length} active · ${paidDebts.length} paid off` : null}
           onAdd={() => setModal({ type: 'debt' })} addTitle="Add debt">
           {openDebts.length === 0 ? (
-            <span className="bg-empty">No debts recorded</span>
+            <span className="bg-empty">{paidDebts.length ? 'All paid off 🎉' : 'No debts recorded'}</span>
           ) : (
             <>
               <div className="bg-figures">
@@ -998,11 +1034,13 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
         </GroupTile>
         {openGroup === 'debts' && (
           <div className="group-panel">
-            {debts.length === 0 ? (
-              <p className="accounts-empty">No debts recorded. Add a loan or informal debt to track it.</p>
+            {openDebts.length === 0 ? (
+              <p className="accounts-empty">
+                {paidDebts.length ? 'No active debts. Everything is paid off. 🎉' : 'No debts recorded. Add a loan or informal debt to track it.'}
+              </p>
             ) : (
               <div className="acct-list">
-                {debts.map(d => (
+                {openDebts.map(d => (
                   <DebtCard
                     key={d.id}
                     debt={d}
@@ -1011,6 +1049,22 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
                   />
                 ))}
               </div>
+            )}
+            {paidDebts.length > 0 && (
+              <>
+                <button type="button" className={`history-toggle ${showPaidDebts ? 'open' : ''}`}
+                  aria-expanded={showPaidDebts} onClick={() => setShowPaidDebts(v => !v)}>
+                  <span>Paid off ({paidDebts.length})</span>
+                  <ChevronRight size={15} strokeWidth={1.8} className="bg-chevron" />
+                </button>
+                {showPaidDebts && (
+                  <div className="acct-list">
+                    {paidDebts.map(d => (
+                      <PaidDebtCard key={d.id} debt={d} transactions={transactions} onDelete={deleteDebt} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

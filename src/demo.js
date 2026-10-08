@@ -44,6 +44,8 @@ export function demoData() {
     { id: 't14', date: day(6), description: 'Send money home', type: 'transfer', amount: 100,
       toAmount: 1552, fromAccountId: 'a1', toAccountId: 'a3', accountId: 'a1', currency: 'GBP', toCurrency: 'GHS' },
     tx('t15', 7, 'Stocks purchase', 150, 'savings', 'Stock Portfolio', 'a1'),
+    tx('t21', 190, 'Phone instalment', 1800, 'expense', 'Debt Repayment', 'a3', { debtId: 'd2' }),
+    tx('t22', 9, 'Phone final instalment', 1800, 'expense', 'Debt Repayment', 'a3', { debtId: 'd2' }),
     // a small business project
     tx('t16', 20, 'Laptop for the business', 650, 'expense', 'Equipment', 'a2', { projectId: 'p1' }),
     tx('t17', 12, 'Company registration', 50, 'expense', 'Registration & Licences', 'a1', { projectId: 'p1' }),
@@ -61,6 +63,7 @@ export function demoData() {
   ];
   const debts = [
     { id: 'd1', name: 'Car loan', currency: 'GBP', originalAmount: 6000, currentBalance: 4200, interestRate: 6.9, monthlyPayment: 180 },
+    { id: 'd2', name: 'Phone hire purchase', currency: 'GHS', originalAmount: 3600, currentBalance: 0, status: 'paid', paidOffDate: day(9), monthlyPayment: 600 },
   ];
   const assets = [
     { id: 's1', name: 'Treasury bills', assetType: 'tbill', currency: 'GHS', costBasis: 5000, currentValue: 5400, status: 'active', maturityDate: day(-60) },

@@ -300,7 +300,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                 <label>Linked Debt (optional)</label>
                 <select value={debtId} onChange={e => setDebtId(e.target.value)}>
                   <option value="">— Select debt —</option>
-                  {debts.map(d => (
+                  {debts.filter(d => (Number(d.currentBalance) || 0) > 0.005 || d.id === debtId).map(d => (
                     <option key={d.id} value={d.id}>{d.name} · {d.currency}</option>
                   ))}
                 </select>

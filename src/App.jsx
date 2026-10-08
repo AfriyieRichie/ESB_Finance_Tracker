@@ -15,6 +15,7 @@ import { useInstall } from './pwa';
 import { notify, registerPush } from './notifications';
 import { DEMO } from './demo';
 import { isPersonal } from './projects';
+import { isPaidOff } from './debts';
 import './App.css';
 
 const TABS = [
@@ -179,6 +180,26 @@ function AppContent() {
     stamp(rawDebts,    updateDebt);
     stamp(rawAssets,   updateAsset);
   }, [loading, prefsLoading, rawAccounts, rawDebts, rawAssets, baseCurrency, updateAccount, updateDebt, updateAsset]);
+
+  // Debts move to the paid-off history when nothing is owed (dated by the last repayment), and
+  // come back to the active list if money is owed again (e.g. a repayment was edited or deleted)
+  const debtStatusSync = useRef(new Set());
+  useEffect(() => {
+    if (loading || DEMO) return;
+    for (const d of rawDebts) {
+      const paid = isPaidOff(d);
+      const key  = `${d.id}:${paid}`;
+      if (debtStatusSync.current.has(key)) continue;
+      if (paid && d.status !== 'paid') {
+        debtStatusSync.current.add(key);
+        const last = rawTransactions.filter(t => t.debtId === d.id).map(t => t.date).sort().pop();
+        updateDebt(d.id, { status: 'paid', paidOffDate: last || new Date().toISOString().slice(0, 10) });
+      } else if (!paid && d.status === 'paid') {
+        debtStatusSync.current.add(key);
+        updateDebt(d.id, { status: 'active', paidOffDate: null });
+      }
+    }
+  }, [loading, rawDebts, rawTransactions, updateDebt]);
 
   // ── Daily nudge ────────────────────────────────────────────────────────
   useEffect(() => {
