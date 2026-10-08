@@ -44,6 +44,11 @@ export function demoData() {
     { id: 't14', date: day(6), description: 'Send money home', type: 'transfer', amount: 100,
       toAmount: 1552, fromAccountId: 'a1', toAccountId: 'a3', accountId: 'a1', currency: 'GBP', toCurrency: 'GHS' },
     tx('t15', 7, 'Stocks purchase', 150, 'savings', 'Stock Portfolio', 'a1'),
+    // a small business project
+    tx('t16', 20, 'Laptop for the business', 650, 'expense', 'Shopping', 'a2', { projectId: 'p1' }),
+    tx('t17', 12, 'Company registration', 50, 'expense', 'Other', 'a1', { projectId: 'p1' }),
+    tx('t18', 6, 'Instagram ads', 120, 'expense', 'Entertainment', 'a1', { projectId: 'p1' }),
+    tx('t19', 2, 'First client payment', 380, 'income', 'Business', 'a1', { projectId: 'p1' }),
   ];
   const budgets = [
     { id: 'b1', type: 'expense', category: 'Food & Dining',  amount: 300,  month },
@@ -60,5 +65,8 @@ export function demoData() {
     { id: 's1', name: 'Treasury bills', assetType: 'tbill', currency: 'GHS', costBasis: 5000, currentValue: 5400, status: 'active', maturityDate: day(-60) },
     { id: 's2', name: 'Index fund', assetType: 'stocks', currency: 'GBP', costBasis: 1200, currentValue: 1310, status: 'active' },
   ];
-  return { accounts, transactions, budgets, debts, assets };
+  const projects = [
+    { id: 'p1', name: 'Online store', startDate: day(25), budget: 2000, color: '#3b82f6', status: 'active', notes: 'Handmade accessories' },
+  ];
+  return { accounts, transactions, budgets, debts, assets, projects };
 }

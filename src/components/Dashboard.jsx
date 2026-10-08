@@ -97,7 +97,8 @@ const PieTooltip = ({ active, payload, fmt, tipStyle }) => {
 };
 
 // All totals here use base-currency values (baseAmount / baseBalance / baseValue) computed in App
-export default function Dashboard({ transactions, budgets, accounts, debts, assets, missingRates = [] }) {
+// `transactions` are personal only (project transactions excluded); `allTransactions` feeds the recent list
+export default function Dashboard({ transactions, allTransactions, budgets, accounts, debts, assets, missingRates = [] }) {
   const { prefs, fmt, fmtCur, baseCurrency, rateFor, ratesDate } = usePreferences();
   // Effective theme ('system' is already resolved onto <html data-theme>)
   const themeAttr = document.documentElement.dataset.theme;
@@ -190,8 +191,8 @@ export default function Dashboard({ transactions, budgets, accounts, debts, asse
 
   // ── Recent 6 transactions ─────────────────────────────────────────────
   const recentTransactions = useMemo(() =>
-    [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6),
-    [transactions]
+    [...(allTransactions || transactions)].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 6),
+    [allTransactions, transactions]
   );
 
   const statCards = [

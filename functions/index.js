@@ -111,6 +111,7 @@ async function weeklyDigest(uid, prefs, today) {
   for (const d of txSnap.docs) {
     const tx = d.data();
     if (!(tx.type in totals)) continue;               // skip transfers
+    if (tx.projectId) continue;                       // business/project money isn't personal spending
     const v = await toBase(tx, base, prefs, accountCurrency);
     totals[tx.type] += v;
     if (tx.type === 'expense') byCategory[tx.category] = (byCategory[tx.category] || 0) + v;

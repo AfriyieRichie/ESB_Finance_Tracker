@@ -4,6 +4,8 @@ import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanc
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
 import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
 import CurrencySelect, { BaseApprox } from './CurrencySelect';
+import { ProjectCard, ProjectFormModal, ProjectDetailModal } from './Projects';
+import { projectStats } from '../projects';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -863,7 +865,7 @@ function GroupTile({ id, title, count, noun, open, onToggle, onAdd, addTitle, ch
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -887,6 +889,13 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
   const cashByCurrency = Object.entries(
     accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
   ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
+
+  // Projects: totals across all projects (base currency, each transaction at its rate of the day)
+  const activeProjects = projects.filter(p => p.status !== 'closed');
+  const projTotals = projects.reduce((t, p) => {
+    const st = projectStats(p, transactions);
+    return { putIn: t.putIn + st.putIn, earned: t.earned + st.earned, net: t.net + st.net };
+  }, { putIn: 0, earned: 0, net: 0 });
 
   // Which group's items are showing; all collapsed at first
   const [openGroup, setOpenGroup] = useState(null);
@@ -924,7 +933,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
         </p>
       )}
 
-      <div className="group-grid">
+      <div className="group-grid cols-4">
         {/* ── Cash Accounts ── */}
         <GroupTile id="cash" open={openGroup === 'cash'} onToggle={toggle} title="Cash Accounts" count={accounts.length} noun="account"
           onAdd={() => setModal({ type: 'account' })} addTitle="Add account">
@@ -1024,6 +1033,38 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
             </div>
           )}
         </GroupTile>
+        {/* ── Projects (businesses / side projects) ── */}
+        <GroupTile id="projects" open={openGroup === 'projects'} onToggle={toggle} title="Projects"
+          count={activeProjects.length} noun="project"
+          onAdd={() => setModal({ type: 'projectForm' })} addTitle="New project">
+          {projects.length === 0 ? (
+            <span className="bg-empty">Track a business or side project</span>
+          ) : (
+            <div className="bg-figures">
+              <div><span className="bs-label">Put in</span><span className="bg-val">{fmt(projTotals.putIn)}</span></div>
+              <div><span className="bs-label">Earned</span><span className="bg-val">{fmt(projTotals.earned)}</span></div>
+              <div><span className="bs-label">Net</span><span className={`bg-val ${projTotals.net >= 0 ? 'good' : 'bad'}`}>{projTotals.net >= 0 ? '+' : '−'}{fmt(Math.abs(projTotals.net))}</span></div>
+            </div>
+          )}
+        </GroupTile>
+        {openGroup === 'projects' && (
+          <div className="group-panel">
+            {projects.length === 0 ? (
+              <p className="accounts-empty">
+                No projects yet. Create one to track the money you put into a business and what it earns.
+                {' '}<button type="button" className="auth-switch-link" onClick={() => setModal({ type: 'projectForm' })}>New project</button>
+              </p>
+            ) : (
+              <div className="asset-grid">
+                {[...activeProjects, ...projects.filter(p => p.status === 'closed')].map(p => (
+                  <ProjectCard key={p.id} project={p} transactions={transactions}
+                    onOpen={proj => setModal({ type: 'project', data: proj })} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {openGroup === 'assets' && (
           <div className="group-panel">
             {activeAssets.length === 0 ? (
@@ -1054,6 +1095,20 @@ export default function Accounts({ accounts, debts, assets, transactions = [], m
             : addAccount}
           onClose={close}
         />
+      )}
+      {modal?.type === 'projectForm' && (
+        <ProjectFormModal existing={modal.data}
+          onSave={modal.data ? (u) => updateProject(modal.data.id, u) : addProject}
+          onClose={close} />
+      )}
+      {modal?.type === 'project' && (
+        <ProjectDetailModal
+          project={projects.find(p => p.id === modal.data.id) || modal.data}
+          transactions={transactions} accounts={accounts}
+          onEdit={p => setModal({ type: 'projectForm', data: p })}
+          onToggleStatus={p => updateProject(p.id, { status: p.status === 'closed' ? 'active' : 'closed' })}
+          onDelete={deleteProject}
+          onClose={close} />
       )}
       {modal?.type === 'activity' && (
         <AccountActivityModal

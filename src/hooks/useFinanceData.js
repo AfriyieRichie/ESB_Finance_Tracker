@@ -142,6 +142,7 @@ export function useFinanceData(userId) {
   const [accounts,     setAccounts]     = useState(demo?.accounts || []);
   const [debts,        setDebts]        = useState(demo?.debts || []);
   const [assets,       setAssets]       = useState(demo?.assets || []);
+  const [projects,     setProjects]     = useState(demo?.projects || []);
   const [loading,      setLoading]      = useState(!demo);
   // True once the server (not just the offline cache) has confirmed the accounts list
   const [accountsConfirmed, setAccountsConfirmed] = useState(!!demo);
@@ -152,7 +153,7 @@ export function useFinanceData(userId) {
     if (!userId || DEMO) return;
 
     setLoadIssue(null);
-    const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false };
+    const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false, projects: false };
     const checkDone = () => { if (Object.values(loaded).every(Boolean)) { clearTimeout(slowTimer); setLoading(false); } };
 
     // A failed listener must still count as "done", otherwise the spinner never stops
@@ -187,7 +188,10 @@ export function useFinanceData(userId) {
     const unsubAssets = listen('assets', 'assets', {},
       snap => setAssets(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); };
+    const unsubProjects = listen('projects', 'projects', {},
+      snap => setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); unsubProjects(); };
   }, [userId]);
 
   // ── Transactions ────────────────────────────────────────────────────────
@@ -390,6 +394,30 @@ export function useFinanceData(userId) {
     await whenSaved(batch.commit());
   }, [userId, assets]);
 
+  // ── Projects ────────────────────────────────────────────────────────────
+
+  const addProject = useCallback(async (project) => {
+    await whenSaved(addDoc(collection(db, 'users', userId, 'projects'), { status: 'active', ...project }));
+  }, [userId]);
+
+  const updateProject = useCallback(async (id, updates) => {
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'projects', id), updates));
+  }, [userId]);
+
+  // Deleting a project keeps its transactions (they stay in your accounts) but un-tags them,
+  // so they count as personal again. Batches stay under Firestore's 500-write limit.
+  const deleteProject = useCallback(async (id) => {
+    const tagged = transactions.filter(t => t.projectId === id);
+    const refs = [doc(db, 'users', userId, 'projects', id)];
+    for (let i = 0; i <= tagged.length; i += 450) {
+      const batch = writeBatch(db);
+      if (i === 0) batch.delete(refs[0]);
+      tagged.slice(i, i + 450).forEach(t =>
+        batch.update(doc(db, 'users', userId, 'transactions', t.id), { projectId: deleteField() }));
+      await whenSaved(batch.commit());
+    }
+  }, [userId, transactions]);
+
   const deleteAsset = useCallback(async (id) => {
     await whenSaved(deleteDoc(doc(db, 'users', userId, 'assets', id)));
   }, [userId]);
@@ -411,7 +439,7 @@ export function useFinanceData(userId) {
 
     // Remove links (and their converted amounts) that the edit dropped
     const writeUpdates = { ...updates };
-    ['debtId', 'assetId', 'debtAmount', 'assetAmount'].forEach(k => {
+    ['debtId', 'assetId', 'debtAmount', 'assetAmount', 'projectId'].forEach(k => {
       if (original[k] !== undefined && updates[k] === undefined) writeUpdates[k] = deleteField();
     });
     batch.update(doc(db, 'users', userId, 'transactions', original.id), writeUpdates);
@@ -460,13 +488,14 @@ export function useFinanceData(userId) {
   }, [userId]);
 
   return {
-    transactions, budgets, accounts, debts, assets, loading, accountsConfirmed, loadIssue,
+    transactions, budgets, accounts, debts, assets, projects, loading, accountsConfirmed, loadIssue,
     addTransaction, updateTransaction, deleteTransaction,
     addTransfer,
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    addProject, updateProject, deleteProject,
     getSpending,
   };
 }

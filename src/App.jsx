@@ -14,6 +14,7 @@ import { useFinanceData } from './hooks/useFinanceData';
 import { useInstall } from './pwa';
 import { notify, registerPush } from './notifications';
 import { DEMO } from './demo';
+import { isPersonal } from './projects';
 import './App.css';
 
 const TABS = [
@@ -122,6 +123,7 @@ function AppContent() {
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    projects, addProject, updateProject, deleteProject,
   } = useFinanceData(currentUser?.uid);
 
   // ── Multi-currency: tag everything with its currency and its value in the base currency ──
@@ -158,6 +160,10 @@ function AppContent() {
     });
     return { transactions, accounts, debts, assets, missingRates: [...missing] };
   }, [rawTransactions, rawAccounts, rawDebts, rawAssets, baseCurrency, toBase]);
+
+  // Option A: project (business) transactions move account balances but stay out of personal
+  // budgets, spending figures and budget alerts
+  const personalTransactions = useMemo(() => transactions.filter(isPersonal), [transactions]);
 
   // Records created before multi-currency have no currency; pin them to the current base
   // so changing the base currency later doesn't silently reinterpret their amounts.
@@ -220,11 +226,11 @@ function AppContent() {
     if (n.largeTransaction && amt >= (n.largeTransactionThreshold || 500)) {
       notify('Large transaction recorded', `${tx.description}: ${fmt(amt)}`, `large-${tx.date}`);
     }
-    if (n.budgetAlert && tx.type === 'expense') {
+    if (n.budgetAlert && tx.type === 'expense' && !tx.projectId) {
       const month  = tx.date.slice(0, 7);
       const budget = budgets.find(b => b.month === month && (b.type || 'expense') === 'expense' && b.category === tx.category);
       if (budget) {
-        const before = transactions
+        const before = personalTransactions
           .filter(t => t.type === 'expense' && t.category === tx.category && t.date.startsWith(month))
           .reduce((s, t) => s + t.baseAmount, 0);
         const after = before + amt;
@@ -369,18 +375,18 @@ function AppContent() {
         ) : (
           <>
             {activeTab === 'dashboard' && (
-              <Dashboard transactions={transactions} budgets={budgets}
+              <Dashboard transactions={personalTransactions} allTransactions={transactions} budgets={budgets}
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates} />
             )}
             {activeTab === 'budget' && (
-              <Budget budgets={budgets} transactions={transactions}
+              <Budget budgets={budgets} transactions={personalTransactions}
                 upsertBudget={upsertBudget} deleteBudget={deleteBudget} />
             )}
             {activeTab === 'transactions' && (
               <Transactions
                 transactions={transactions} addTransaction={addTransactionWithAlerts}
                 updateTransaction={updateTransaction} deleteTransaction={deleteTransaction}
-                accounts={accounts} debts={debts} assets={assets}
+                accounts={accounts} debts={debts} assets={assets} projects={projects}
                 addTransfer={addTransfer} budgets={budgets}
               />
             )}
@@ -388,6 +394,7 @@ function AppContent() {
               <Accounts
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates}
                 transactions={transactions}
+                projects={projects} addProject={addProject} updateProject={updateProject} deleteProject={deleteProject}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt}
                 addAsset={addAsset} updateAssetValue={updateAssetValue}

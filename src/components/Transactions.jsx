@@ -18,7 +18,7 @@ import { BaseApprox } from './CurrencySelect';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 
-function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, addTransfer, budgets, existing }) {
+function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, projects = [], addTransfer, budgets, existing }) {
   const { fmtCur, convert, txFxMeta } = usePreferences();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
@@ -38,6 +38,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
   const [accountId,   setAccountId]=useState(existing?.accountId || accounts[0]?.id || '');
   const [debtId,      setDebtId]  = useState(existing?.debtId || '');
   const [assetId,     setAssetId] = useState(existing?.assetId || '');
+  const [projectId,   setProjectId] = useState(existing?.projectId || '');
   const [warning,     setWarning] = useState(null);
   const [miniFrom,    setMiniFrom]= useState('');
   const [miniAmt,     setMiniAmt] = useState('');
@@ -87,6 +88,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
       tx.assetId = assetId;
       if (assetAmount !== null) tx.assetAmount = assetAmount;
     }
+    if (projectId) tx.projectId = projectId;
     return tx;
   };
 
@@ -268,6 +270,22 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
               )}
             </div>
 
+            {/* Project: business costs and income are tracked there, not in personal budgets */}
+            {(projects.some(p => p.status !== 'closed') || projectId) && (
+              <div className="form-group">
+                <label>Project (optional)</label>
+                <select value={projectId} onChange={e => setProjectId(e.target.value)}>
+                  <option value="">— Personal (no project) —</option>
+                  {projects.filter(p => p.status !== 'closed' || p.id === projectId).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {projectId && (
+                  <p className="fx-hint">Counted in this project, not in your personal budgets or spending.</p>
+                )}
+              </div>
+            )}
+
             {isDebtRepay && debts.length > 0 && (
               <div className="form-group">
                 <label>Linked Debt (optional)</label>
@@ -405,7 +423,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'transfer', label: '⇄ Transfer' },
 ];
 
-export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, addTransfer, budgets }) {
+export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, projects = [], addTransfer, budgets }) {
   const { fmt, fmtCur } = usePreferences();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
@@ -419,6 +437,8 @@ export default function Transactions({ transactions, addTransaction, updateTrans
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterType, setFilterType]         = useState('All');
   const [filterAccount, setFilterAccount]   = useState('All');
+  const [filterProject, setFilterProject]   = useState('All');   // 'All' | 'personal' | project id
+  const projMap = useMemo(() => Object.fromEntries(projects.map(p => [p.id, p])), [projects]);
   const [search, setSearch]                 = useState('');
 
   const acctMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a])), [accounts]);
@@ -431,11 +451,13 @@ export default function Transactions({ transactions, addTransaction, updateTrans
         if (filterType !== 'All' && t.type !== filterType) return false;
         // Transfers belong to both the sending and the receiving account
         if (filterAccount !== 'All' && t.accountId !== filterAccount && t.toAccountId !== filterAccount) return false;
+        if (filterProject === 'personal' && t.projectId) return false;
+        if (filterProject !== 'All' && filterProject !== 'personal' && t.projectId !== filterProject) return false;
         if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [transactions, filterMonth, filterCategory, filterType, filterAccount, search]);
+  }, [transactions, filterMonth, filterCategory, filterType, filterAccount, filterProject, search]);
 
   // Totals in the base currency
   const totalIncome   = filtered.filter(t => t.type === 'income').reduce((s, t)  => s + t.baseAmount, 0);
@@ -444,7 +466,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
 
   const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '' };
 
-  const isFiltered = filterCategory !== 'All' || filterType !== 'All' || filterAccount !== 'All' || search;
+  const isFiltered = filterCategory !== 'All' || filterType !== 'All' || filterAccount !== 'All' || filterProject !== 'All' || search;
 
   // Categories shown in dropdown depend on selected type
   const dropdownCategories = filterType === 'All' ? allEffectiveCats
@@ -488,8 +510,13 @@ export default function Transactions({ transactions, addTransaction, updateTrans
         <FilterDropdown value={filterType} onChange={handleTypeChange} options={TYPE_FILTER_OPTIONS} />
         <FilterDropdown value={filterAccount} onChange={setFilterAccount}
           options={[{ value: 'All', label: 'All Accounts' }, ...accounts.map(a => ({ value: a.id, label: a.name }))]} />
+        {projects.length > 0 && (
+          <FilterDropdown value={filterProject} onChange={setFilterProject}
+            options={[{ value: 'All', label: 'All Projects' }, { value: 'personal', label: 'Personal only' },
+              ...projects.map(p => ({ value: p.id, label: p.name }))]} />
+        )}
         {isFiltered && (
-          <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setFilterAccount('All'); setSearch(''); }}>
+          <button className="btn-ghost" onClick={() => { setFilterCategory('All'); setFilterType('All'); setFilterAccount('All'); setFilterProject('All'); setSearch(''); }}>
             Clear filters
           </button>
         )}
@@ -547,6 +574,9 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                           {t.category}
                         </span>
                       )}
+                      {t.projectId && projMap[t.projectId] && (
+                        <span className="proj-badge"><i style={{ background: projMap[t.projectId].color }} />{projMap[t.projectId].name}</span>
+                      )}
                     </td>
                     <td className="tx-type"><TypeBadge type={t.type} /></td>
                     <td className={`tx-amount ${t.type}`}>
@@ -575,7 +605,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
         <TransactionModal
           onSave={addTransaction}
           onClose={() => setShowModal(false)}
-          accounts={accounts} debts={debts} assets={assets}
+          accounts={accounts} debts={debts} assets={assets} projects={projects}
           addTransfer={addTransfer} budgets={budgets}
         />
       )}
@@ -584,7 +614,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
           existing={editingTx}
           onUpdate={updateTransaction}
           onClose={() => setEditingTx(null)}
-          accounts={accounts} debts={debts} assets={assets}
+          accounts={accounts} debts={debts} assets={assets} projects={projects}
           addTransfer={addTransfer} budgets={budgets}
         />
       )}
