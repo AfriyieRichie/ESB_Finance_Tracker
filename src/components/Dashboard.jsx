@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -7,6 +7,7 @@ import {
 import { usePreferences } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import { newestFirst } from '../txOrder';
+import MonthPicker, { monthLabel } from './MonthPicker';
 
 // Chart colours per theme (SVG attributes can't read CSS variables, so they're picked in JS)
 const CHART_THEME = {
@@ -110,7 +111,15 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
   const mask   = '••••••';
 
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // The month being viewed (defaults to the current one); past months can be picked from the header
+  const [viewMonth, setViewMonth] = useState(null);
+  const currentMonth = viewMonth || thisMonth;
+  const isPast = currentMonth !== thisMonth;
+  const periodLabel = isPast ? monthLabel(currentMonth, 'short') : 'This month';
+  const allTx = allTransactions || transactions;
+  const firstMonth = useMemo(() => allTx.reduce((min, t) => (t.date && t.date.slice(0, 7) < min ? t.date.slice(0, 7) : min), thisMonth), [allTx, thisMonth]);
+  const monthsWithData = useMemo(() => new Set(allTx.map(t => t.date?.slice(0, 7)).filter(Boolean)), [allTx]);
 
   // ── Account-derived balances (ground truth) ────────────────────────────
   const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
@@ -159,8 +168,9 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
 
   // ── Monthly trend (area chart) – last 6 months ─────────────────────────
   const monthlyTrend = useMemo(() => {
+    const [selY, selM] = currentMonth.split('-').map(Number);
     return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const d = new Date(selY, selM - 1 - (5 - i), 1);
       const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const txs = transactions.filter(t => t.date.startsWith(m));
       return {
@@ -170,7 +180,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
         Savings:  txs.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0),
       };
     });
-  }, [transactions]);
+  }, [transactions, currentMonth]);
 
   // ── Budget vs actual ──────────────────────────────────────────────────
   const budgetComparison = useMemo(() => {
@@ -192,19 +202,19 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
 
   // ── Recent 6 transactions ─────────────────────────────────────────────
   const recentTransactions = useMemo(() =>
-    [...(allTransactions || transactions)].sort(newestFirst).slice(0, 6),
-    [allTransactions, transactions]
+    [...allTx].filter(t => !isPast || t.date.startsWith(currentMonth)).sort(newestFirst).slice(0, 6),
+    [allTx, isPast, currentMonth]
   );
 
   const statCards = [
-    { label: 'Monthly Income',   value: hidden ? mask : fmt(stats.income),   cls: 'income',  sub: 'All sources this month' },
-    { label: 'Monthly Expenses', value: hidden ? mask : fmt(stats.expenses), cls: 'expense', sub: 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
+    { label: 'Monthly Income',   value: hidden ? mask : fmt(stats.income),   cls: 'income',  sub: isPast ? `All sources in ${periodLabel}` : 'All sources this month' },
+    { label: 'Monthly Expenses', value: hidden ? mask : fmt(stats.expenses), cls: 'expense', sub: isPast ? `Total spent in ${periodLabel}` : 'Total spent this month',  pct: stats.expensePct, pctCls: 'pct-expense' },
     { label: 'Saved & Invested', value: hidden ? mask : fmt(stats.saved),    cls: 'saved',   sub: 'Savings + investments',   pct: stats.savedPct,   pctCls: 'pct-saved'   },
     {
-      label:    'Cash Balance',
+      label:    isPast ? 'Cash Balance (today)' : 'Cash Balance',
       value:    hidden ? mask : fmt(totalCash),
       cls:      totalCash >= 0 ? 'balance-pos' : 'balance-neg',
-      sub:      totalCash >= 0 ? 'Across all accounts' : 'Negative balance!',
+      sub:      totalCash >= 0 ? (isPast ? 'Live balances, across all accounts' : 'Across all accounts') : 'Negative balance!',
       netWorth: hidden ? mask : fmt(netWorth),
       nwCls:    netWorth >= 0 ? 'nw-pos' : 'nw-neg',
     },
@@ -214,9 +224,8 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
     <div className="dashboard">
       <div className="page-header">
         <h2>Dashboard</h2>
-        <span className="month-badge">
-          {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </span>
+        <MonthPicker value={currentMonth} latest={thisMonth} earliest={firstMonth} withData={monthsWithData}
+          onChange={ym => setViewMonth(ym >= thisMonth ? null : ym)} />
       </div>
 
       {missingRates.length > 0 && (
@@ -268,7 +277,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
         <div className="chart-card span-2">
           <div className="chart-header">
             <h3>Income · Expenses · Savings</h3>
-            <span className="chart-badge">Last 6 months</span>
+            <span className="chart-badge">{isPast ? `6 months to ${periodLabel}` : 'Last 6 months'}</span>
           </div>
           <ResponsiveContainer width="100%" height={230}>
             <AreaChart data={monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
@@ -302,7 +311,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
         <div className="chart-card">
           <div className="chart-header">
             <h3>Spending by Category</h3>
-            <span className="chart-badge">This month</span>
+            <span className="chart-badge">{periodLabel}</span>
           </div>
           {expenseCategoryData.length > 0 ? (
             <>
@@ -326,7 +335,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
                 ))}
               </div>
             </>
-          ) : <div className="empty-state-sm">No expenses this month yet</div>}
+          ) : <div className="empty-state-sm">{isPast ? `No expenses in ${periodLabel}` : 'No expenses this month yet'}</div>}
         </div>
       </div>
 
@@ -335,7 +344,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
         <div className="chart-card span-2">
           <div className="chart-header">
             <h3>Budget vs Actual</h3>
-            <span className="chart-badge">This month</span>
+            <span className="chart-badge">{periodLabel}</span>
           </div>
           {budgetComparison.length > 0 ? (
             <div className="budget-chart-scroll">
@@ -363,14 +372,14 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
               </ResponsiveContainer>
               </div>
             </div>
-          ) : <div className="empty-state-sm">No budgets set for this month</div>}
+          ) : <div className="empty-state-sm">{isPast ? `No budgets set for ${periodLabel}` : 'No budgets set for this month'}</div>}
         </div>
 
         {/* Savings & Investments breakdown */}
         <div className="chart-card">
           <div className="chart-header">
             <h3>Savings & Investments</h3>
-            <span className="chart-badge">This month</span>
+            <span className="chart-badge">{periodLabel}</span>
           </div>
           {savingsCategoryData.length > 0 ? (
             <>
@@ -394,7 +403,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
                 ))}
               </div>
             </>
-          ) : <div className="empty-state-sm">No savings recorded this month</div>}
+          ) : <div className="empty-state-sm">{isPast ? `No savings recorded in ${periodLabel}` : 'No savings recorded this month'}</div>}
         </div>
       </div>
 
