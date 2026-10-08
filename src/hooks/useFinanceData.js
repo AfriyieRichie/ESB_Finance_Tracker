@@ -43,8 +43,27 @@ export const SAVINGS_CATEGORIES = [
   { name: 'Others',          icon: '💰', color: '#7db896' },
 ];
 
+// Business categories: used for transactions tagged to a project (kept apart from personal ones)
+export const BUSINESS_EXPENSE_CATEGORIES = [
+  { name: 'Equipment',                 icon: '💻', color: '#3b82f6' },
+  { name: 'Stock / Inventory',         icon: '📦', color: '#f59e0b' },
+  { name: 'Marketing & Ads',           icon: '📣', color: '#ec4899' },
+  { name: 'Software & Subscriptions',  icon: '🧩', color: '#8b5cf6' },
+  { name: 'Registration & Licences',   icon: '📄', color: '#14b8a6' },
+  { name: 'Professional Fees',         icon: '⚖️', color: '#06b6d4' },
+  { name: 'Rent & Workspace',          icon: '🏢', color: '#22c55e' },
+  { name: 'Business Travel',           icon: '✈️', color: '#0ea5e9' },
+  { name: 'Other Business Costs',      icon: '🧾', color: '#6b7280' },
+];
+export const BUSINESS_INCOME_CATEGORIES = [
+  { name: 'Sales',                     icon: '🛒', color: '#00e676' },
+  { name: 'Services / Client Payments',icon: '🤝', color: '#2affa0' },
+  { name: 'Other Business Income',     icon: '💷', color: '#7db896' },
+];
+
 export const CATEGORIES     = EXPENSE_CATEGORIES;
-export const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES, ...SAVINGS_CATEGORIES];
+export const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES, ...SAVINGS_CATEGORIES,
+  ...BUSINESS_EXPENSE_CATEGORIES, ...BUSINESS_INCOME_CATEGORIES];
 
 export function getCategoriesForType(type) {
   if (type === 'income')  return INCOME_CATEGORIES;

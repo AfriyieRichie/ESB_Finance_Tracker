@@ -13,6 +13,7 @@ import { useInstall } from '../pwa';
 import { notificationStatus, enableNotifications, notify, pushConfigured } from '../notifications';
 import {
   EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES,
+  BUSINESS_EXPENSE_CATEGORIES, BUSINESS_INCOME_CATEGORIES,
 } from '../hooks/useFinanceData';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -461,6 +462,8 @@ function ManageCategoriesSection({ assets }) {
       {renderGroup('Expense', EXPENSE_CATEGORIES, 'expense')}
       {renderGroup('Income',  INCOME_CATEGORIES,  'income')}
       {renderGroup('Savings', SAVINGS_CATEGORIES, 'savings')}
+      {renderGroup('Business costs (projects)',  BUSINESS_EXPENSE_CATEGORIES, 'business-expense')}
+      {renderGroup('Business income (projects)', BUSINESS_INCOME_CATEGORIES,  'business-income')}
       <AssetTypesGroup assets={assets} />
     </Section>
   );

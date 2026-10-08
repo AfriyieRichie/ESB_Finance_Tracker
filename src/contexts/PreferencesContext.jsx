@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { db, whenSaved } from '../firebase';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES, ASSET_TYPES } from '../hooks/useFinanceData';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, SAVINGS_CATEGORIES, ASSET_TYPES,
+  BUSINESS_EXPENSE_CATEGORIES, BUSINESS_INCOME_CATEGORIES } from '../hooks/useFinanceData';
 import { useExchangeRates } from '../hooks/useExchangeRates';
 import { DEMO } from '../demo';
 
@@ -272,6 +273,14 @@ export function PreferencesProvider({ children, userId }) {
       savings: [
         ...filter(SAVINGS_CATEGORIES, 'savings'),
         ...customCategories.filter(c => c.type === 'savings'),
+      ],
+      'business-expense': [
+        ...filter(BUSINESS_EXPENSE_CATEGORIES, 'business-expense'),
+        ...customCategories.filter(c => c.type === 'business-expense'),
+      ],
+      'business-income': [
+        ...filter(BUSINESS_INCOME_CATEGORIES, 'business-income'),
+        ...customCategories.filter(c => c.type === 'business-income'),
       ],
     };
   }, [prefs.hiddenCategories, prefs.customCategories]);

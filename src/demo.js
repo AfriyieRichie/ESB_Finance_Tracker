@@ -45,10 +45,10 @@ export function demoData() {
       toAmount: 1552, fromAccountId: 'a1', toAccountId: 'a3', accountId: 'a1', currency: 'GBP', toCurrency: 'GHS' },
     tx('t15', 7, 'Stocks purchase', 150, 'savings', 'Stock Portfolio', 'a1'),
     // a small business project
-    tx('t16', 20, 'Laptop for the business', 650, 'expense', 'Shopping', 'a2', { projectId: 'p1' }),
-    tx('t17', 12, 'Company registration', 50, 'expense', 'Other', 'a1', { projectId: 'p1' }),
-    tx('t18', 6, 'Instagram ads', 120, 'expense', 'Entertainment', 'a1', { projectId: 'p1' }),
-    tx('t19', 2, 'First client payment', 380, 'income', 'Business', 'a1', { projectId: 'p1' }),
+    tx('t16', 20, 'Laptop for the business', 650, 'expense', 'Equipment', 'a2', { projectId: 'p1' }),
+    tx('t17', 12, 'Company registration', 50, 'expense', 'Registration & Licences', 'a1', { projectId: 'p1' }),
+    tx('t18', 6, 'Instagram ads', 120, 'expense', 'Marketing & Ads', 'a1', { projectId: 'p1' }),
+    tx('t19', 2, 'First client payment', 380, 'income', 'Sales', 'a1', { projectId: 'p1' }),
   ];
   const budgets = [
     { id: 'b1', type: 'expense', category: 'Food & Dining',  amount: 300,  month },

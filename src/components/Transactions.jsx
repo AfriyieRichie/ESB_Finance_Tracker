@@ -12,7 +12,6 @@ function TypeBadge({ type }) {
     </span>
   );
 }
-import { getCategoriesForType } from '../hooks/useFinanceData';
 import { usePreferences, useEffectiveCategoriesForType, symbolFor } from '../contexts/PreferencesContext';
 import { BaseApprox } from './CurrencySelect';
 import CategoryIcon from './CategoryIcon';
@@ -23,7 +22,11 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
   const savingsCats = useEffectiveCategoriesForType('savings');
+  const bizCostCats = useEffectiveCategoriesForType('business-expense');
+  const bizIncCats  = useEffectiveCategoriesForType('business-income');
   const catsByType  = { expense: expenseCats, income: incomeCats, savings: savingsCats };
+  // Project transactions use business categories: income → business income, anything else → costs
+  const catsFor = (t, proj) => proj ? (t === 'income' ? bizIncCats : bizCostCats) : (catsByType[t] || expenseCats);
 
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -44,7 +47,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
   const [miniAmt,     setMiniAmt] = useState('');
   const [miniBusy,    setMiniBusy]= useState(false);
 
-  const cats        = catsByType[type] || expenseCats;
+  const cats        = catsFor(type, projectId);
   const activeAssets = assets.filter(a => a.status === 'active');
   const isDebtRepay  = category === 'Debt Repayment';
 
@@ -54,7 +57,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
 
   const handleTypeChange = (t) => {
     setType(t);
-    setCategory((catsByType[t] || expenseCats)[0]?.name || '');
+    setCategory(catsFor(t, projectId)[0]?.name || '');
     setWarning(null);
     setDebtId('');
     setAssetId('');
@@ -248,7 +251,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                  'Category'}
               </label>
               <CategorySelect categories={cats} value={category} onChange={v => { setCategory(v); setDebtId(''); }} />
-              {!hasBudget && (
+              {!hasBudget && !projectId && (
                 <p className="no-budget-hint">
                   No budget set for <strong>{category}</strong> in this month.{' '}
                   <span>Go to the Budget tab to add one.</span>
@@ -274,7 +277,13 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
             {(projects.some(p => p.status !== 'closed') || projectId) && (
               <div className="form-group">
                 <label>Project (optional)</label>
-                <select value={projectId} onChange={e => setProjectId(e.target.value)}>
+                <select value={projectId} onChange={e => {
+                  const next = e.target.value;
+                  setProjectId(next);
+                  // switching between personal and business: pick a category from the right list
+                  const list = catsFor(type, next);
+                  if (!list.some(c => c.name === category)) setCategory(list[0]?.name || '');
+                }}>
                   <option value="">— Personal (no project) —</option>
                   {projects.filter(p => p.status !== 'closed' || p.id === projectId).map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
@@ -428,7 +437,10 @@ export default function Transactions({ transactions, addTransaction, updateTrans
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
   const savingsCats = useEffectiveCategoriesForType('savings');
-  const allEffectiveCats = [...expenseCats, ...incomeCats, ...savingsCats];
+  const bizCostCats = useEffectiveCategoriesForType('business-expense');
+  const bizIncCats  = useEffectiveCategoriesForType('business-income');
+  const allEffectiveCats = [...expenseCats, ...incomeCats, ...savingsCats,
+    ...(projects.length ? [...bizCostCats, ...bizIncCats] : [])];
 
   const now = new Date();
   const [showModal, setShowModal]           = useState(false);
@@ -470,15 +482,17 @@ export default function Transactions({ transactions, addTransaction, updateTrans
 
   // Categories shown in dropdown depend on selected type
   const dropdownCategories = filterType === 'All' ? allEffectiveCats
-    : filterType === 'income' ? incomeCats
+    : filterType === 'income' ? [...incomeCats, ...(projects.length ? bizIncCats : [])]
     : filterType === 'savings' ? savingsCats
-    : expenseCats;
+    : [...expenseCats, ...(projects.length ? bizCostCats : [])];
 
   // Reset category filter when type changes and current category doesn't belong to new type
   const handleTypeChange = (newType) => {
     setFilterType(newType);
     if (newType !== 'All') {
-      const cats = getCategoriesForType(newType);
+      const cats = newType === 'income' ? [...incomeCats, ...bizIncCats]
+        : newType === 'savings' ? savingsCats
+        : [...expenseCats, ...bizCostCats];
       if (filterCategory !== 'All' && !cats.find(c => c.name === filterCategory)) {
         setFilterCategory('All');
       }
