@@ -193,3 +193,66 @@ export const scheduledReminders = onSchedule(
     logger.info(`Checked ${byUser.size} user(s) with push enabled`);
   }
 );
+
+// ─── Branded password-reset email (sent via Resend from miahorropocket.com) ─────────────────────
+import { onCall } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
+import { getAuth } from 'firebase-admin/auth';
+import { createHash } from 'node:crypto';
+
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY');
+const RESET_FROM     = 'MiAhorro Pocket <noreply@miahorropocket.com>';
+const APP_URL        = 'https://app.miahorropocket.com/';
+const RESET_COOLDOWN_MS = 60 * 1000;   // at most one reset email per address per minute
+
+const resetEmailHtml = (link) => `<!doctype html><html><body style="margin:0;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;color:#0d1a14">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;padding:32px">
+<tr><td style="font-size:22px;font-weight:bold;color:#0d1a14;padding-bottom:4px"><span style="color:#00a854">Mi</span>Ahorro Pocket</td></tr>
+<tr><td style="font-size:18px;font-weight:bold;padding:20px 0 8px">Reset your password</td></tr>
+<tr><td style="font-size:15px;line-height:1.6;color:#2a5c3f">We received a request to reset the password for your MiAhorro Pocket account. Tap the button below to choose a new one. This link expires in 1 hour.</td></tr>
+<tr><td style="padding:26px 0"><a href="${link}" style="display:inline-block;background:#00a854;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 26px;border-radius:999px">Reset password</a></td></tr>
+<tr><td style="font-size:13px;line-height:1.6;color:#4a7d5e">If the button doesn't work, copy this link into your browser:<br><a href="${link}" style="color:#00a854;word-break:break-all">${link}</a></td></tr>
+<tr><td style="font-size:13px;line-height:1.6;color:#4a7d5e;padding-top:22px;border-top:1px solid #e3ebe6;margin-top:22px">Didn't ask for this? You can ignore this email; your password won't change.</td></tr>
+</table>
+<p style="font-size:12px;color:#7a9a88;margin-top:16px">MiAhorro Pocket · miahorropocket.com</p>
+</td></tr></table></body></html>`;
+
+// Always answers { ok: true } so it never reveals whether an address has an account.
+export const sendPasswordReset = onCall(
+  { region: 'europe-west2', secrets: [RESEND_API_KEY], cors: true },
+  async (request) => {
+    const email = String(request.data?.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return { ok: true };
+
+    // Cooldown per address (stored hashed, so no plain email addresses are kept)
+    const ref = db.doc(`mailLimits/${createHash('sha256').update(email).digest('hex')}`);
+    const last = (await ref.get()).data()?.lastSent || 0;
+    if (Date.now() - last < RESET_COOLDOWN_MS) return { ok: true };
+    await ref.set({ lastSent: Date.now() });
+
+    let link;
+    try {
+      link = await getAuth().generatePasswordResetLink(email, { url: APP_URL });
+    } catch (err) {
+      if (err.code !== 'auth/user-not-found' && err.code !== 'auth/email-not-found') logger.error('reset link failed', err);
+      return { ok: true };
+    }
+
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_API_KEY.value()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: RESET_FROM, to: [email],
+        subject: 'Reset your MiAhorro Pocket password',
+        html: resetEmailHtml(link),
+        text: `Reset your MiAhorro Pocket password: ${link}\n\nThis link expires in 1 hour. If you didn't ask for this, ignore this email.`,
+      }),
+    });
+    if (!res.ok) {
+      logger.error('Resend send failed', res.status, (await res.text()).slice(0, 300));
+      throw new Error('send-failed');   // client falls back to Firebase's own email
+    }
+    return { ok: true };
+  }
+);

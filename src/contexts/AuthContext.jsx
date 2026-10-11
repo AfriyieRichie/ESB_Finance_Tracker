@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth, clearLocalData } from '../firebase';
+import { app, auth, clearLocalData } from '../firebase';
 import { DEMO, demoUser } from '../demo';
 import {
   createUserWithEmailAndPassword,
@@ -30,8 +30,15 @@ export function AuthProvider({ children }) {
     return signInWithEmailAndPassword(auth, email, password);
   }
 
-  function resetPassword(email) {
-    return sendPasswordResetEmail(auth, email);
+  // Branded reset email from miahorropocket.com (Cloud Function + Resend); if that isn't
+  // available, fall back to Firebase's built-in email so resets always work
+  async function resetPassword(email) {
+    try {
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      await httpsCallable(getFunctions(app, 'europe-west2'), 'sendPasswordReset')({ email });
+    } catch {
+      await sendPasswordResetEmail(auth, email);
+    }
   }
 
   // Sign out and remove this user's offline copy of their data from the device
