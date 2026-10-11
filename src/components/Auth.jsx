@@ -46,7 +46,7 @@ export default function Auth() {
       setBusy(true);
       try {
         await resetPassword(email.trim());
-        setNotice(`If an account exists for ${email.trim()}, a password reset link has been sent. Check your inbox and spam folder.`);
+        setNotice(`If an account exists for ${email.trim()}, we've sent a reset link from MiAhorro Pocket (noreply@esb-finance-tracker.firebaseapp.com). It can take a few minutes: check Spam, Junk and Promotions too. Nothing arriving? Make sure this is the email you signed up with.`);
       } catch (err) {
         setError(friendlyError(err.code));
       } finally {
