@@ -36,6 +36,19 @@ function ColorPicker({ value, onChange }) {
   );
 }
 
+// Tick box for money you're holding on someone else's behalf (excluded from net worth)
+function HeldToggle({ checked, onChange }) {
+  return (
+    <label className="held-check">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+      <span>
+        <b>Money held for others (not mine)</b>
+        <small>e.g. tithe set aside for church. The balance is tracked but left out of your net worth.</small>
+      </span>
+    </label>
+  );
+}
+
 // ─── Add / Edit Account Modal ──────────────────────────────────────────────
 
 function AccountModal({ existing, onSave, onClose }) {
@@ -46,13 +59,14 @@ function AccountModal({ existing, onSave, onClose }) {
   const [balance, setBalance] = useState(existing?.balance ?? '');
   const [phone,   setPhone]   = useState(existing?.phone   || '');
   const [color,   setColor]   = useState(existing?.color   || '#3b82f6');
+  const [held,    setHeld]    = useState(!!existing?.heldForOthers);
   const [busy,    setBusy]    = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     setBusy(true);
-    const data = { name: name.trim(), type, phone, color, currency };
+    const data = { name: name.trim(), type, phone, color, currency, heldForOthers: held };
     if (!existing) data.balance = parseFloat(balance) || 0;
     await onSave(data);
     onClose();
@@ -102,6 +116,7 @@ function AccountModal({ existing, onSave, onClose }) {
             <label>Colour</label>
             <ColorPicker value={color} onChange={setColor} />
           </div>
+          <HeldToggle checked={held} onChange={setHeld} />
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary" disabled={busy}>
@@ -662,6 +677,7 @@ function AccountCard({ account, onEdit, onDelete, onReconcile, onOpen }) {
         <div>
           <p className="acct-name">{account.name}</p>
           <p className="acct-type">{meta.label} · {account.currency}{account.phone ? ` · ${account.phone}` : ''}</p>
+          {account.heldForOthers && <span className="held-badge">Held for others · not in net worth</span>}
         </div>
       </div>
       <div className="acct-card-right">
@@ -758,7 +774,7 @@ function DebtCard({ debt, onEdit, onDelete }) {
 
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
-function AssetCard({ asset, onUpdateValue, onCashOut, onDelete }) {
+function AssetCard({ asset, onUpdateValue, onCashOut, onDelete, onToggleHeld }) {
   const { fmtCur, assetTypes } = usePreferences();
   const fmt = (v) => fmtCur(v, asset.currency);
   const Icon = ASSET_TYPE_ICONS[asset.assetType] || ASSET_TYPE_ICONS.other;
@@ -776,10 +792,16 @@ function AssetCard({ asset, onUpdateValue, onCashOut, onDelete }) {
           <div>
             <p className="acct-name">{asset.name}</p>
             <p className="acct-type">{meta.label}{asset.maturityDate ? ` · Matures ${new Date(asset.maturityDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}</p>
+            {asset.heldForOthers && <span className="held-badge">Held for others · not in net worth</span>}
           </div>
         </div>
         <button className="icon-btn delete-btn" onClick={() => onDelete(asset.id)} title="Delete"><Trash2 size={13} strokeWidth={1.6} /></button>
       </div>
+
+      <label className="held-check small">
+        <input type="checkbox" checked={!!asset.heldForOthers} onChange={e => onToggleHeld(asset, e.target.checked)} />
+        Money held for others (not mine)
+      </label>
 
       <div className="asset-values">
         <div className="asset-val-row">
@@ -979,7 +1001,7 @@ function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, 
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -992,19 +1014,25 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
   const [showPaidDebts, setShowPaidDebts] = useState(false);
   const base = (amount, cur) => toBase(amount || 0, cur) ?? 0;
 
-  const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
+  // Money held for others (e.g. tithe set aside for church) is tracked but isn't yours:
+  // it's left out of cash, investments and net worth and shown on its own line
+  const ownAccounts  = accounts.filter(a => !a.heldForOthers);
+  const ownAssets    = activeAssets.filter(a => !a.heldForOthers);
+  const heldTotal    = accounts.filter(a => a.heldForOthers).reduce((s, a) => s + (a.baseBalance || 0), 0)
+                     + activeAssets.filter(a => a.heldForOthers).reduce((s, a) => s + (a.baseValue || 0), 0);
+  const totalCash        = ownAccounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
   const totalDebts       = openDebts.reduce((s, d) => s + (d.baseBalance || 0), 0);
   const totalBorrowed    = openDebts.reduce((s, d) => s + base(d.originalAmount || d.currentBalance, d.currency), 0);
   const monthlyPayments  = openDebts.reduce((s, d) => s + base(d.monthlyPayment, d.currency), 0);
   const paidPct          = totalBorrowed > 0 ? Math.max(0, Math.min(100, (1 - totalDebts / totalBorrowed) * 100)) : 0;
-  const totalInvested    = activeAssets.reduce((s, a) => s + base(a.costBasis, a.currency), 0);
-  const totalInvestments = activeAssets.reduce((s, a) => s + (a.baseValue || 0), 0);
+  const totalInvested    = ownAssets.reduce((s, a) => s + base(a.costBasis, a.currency), 0);
+  const totalInvestments = ownAssets.reduce((s, a) => s + (a.baseValue || 0), 0);
   const investGain       = totalInvestments - totalInvested;
   const netWorth         = totalCash + totalInvestments - totalDebts;
 
   // Cash held per currency, base currency first (shown on the Cash tile)
   const cashByCurrency = Object.entries(
-    accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
+    ownAccounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
   ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
 
   // Projects: totals across all projects (base currency, each transaction at its rate of the day)
@@ -1040,6 +1068,9 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
           <span className="nw-label">Total Net Worth</span>
           <span className={`nw-value ${netWorth >= 0 ? '' : 'neg'}`}>{fmt(netWorth)}</span>
           <span className="nw-sub">Cash + investments − debts, in {baseCurrency}</span>
+          {heldTotal > 0 && (
+            <span className="nw-held">Held for others: {fmt(heldTotal)} <small>(not included)</small></span>
+          )}
         </div>
       </div>
 
@@ -1182,6 +1213,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
                     onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
                     onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
                     onDelete={deleteAsset}
+                    onToggleHeld={(asset, v) => updateAsset(asset.id, { heldForOthers: v })}
                   />
                 ))}
               </div>

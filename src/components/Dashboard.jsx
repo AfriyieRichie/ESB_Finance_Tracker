@@ -122,14 +122,16 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
   const monthsWithData = useMemo(() => new Set(allTx.map(t => t.date?.slice(0, 7)).filter(Boolean)), [allTx]);
 
   // ── Account-derived balances (ground truth) ────────────────────────────
-  const totalCash        = accounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
-  const totalInvestments = (assets  || []).filter(a => a.status === 'active').reduce((s, a) => s + (a.baseValue || 0), 0);
+  // Money held for others (e.g. tithe) isn't counted in your cash or net worth
+  const ownAccounts      = accounts.filter(a => !a.heldForOthers);
+  const totalCash        = ownAccounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
+  const totalInvestments = (assets  || []).filter(a => a.status === 'active' && !a.heldForOthers).reduce((s, a) => s + (a.baseValue || 0), 0);
   const totalDebts       = (debts   || []).filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
   const netWorth         = totalCash + totalInvestments - totalDebts;
 
   // Cash per currency (base first) for the multi-currency breakdown
   const cashByCurrency = Object.entries(
-    accounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
+    ownAccounts.reduce((m, a) => ({ ...m, [a.currency]: (m[a.currency] || 0) + (a.balance || 0) }), {})
   ).sort(([a], [b]) => (a === baseCurrency ? -1 : b === baseCurrency ? 1 : a.localeCompare(b)));
   const foreignCurrencies = cashByCurrency.map(([c]) => c).filter(c => c !== baseCurrency);
 

@@ -418,7 +418,7 @@ function AppContent() {
                 projects={projects} addProject={addProject} updateProject={updateProject} deleteProject={deleteProject}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt} recordLoanReceipt={recordLoanReceipt}
-                addAsset={addAsset} updateAssetValue={updateAssetValue}
+                addAsset={addAsset} updateAsset={updateAsset} updateAssetValue={updateAssetValue}
                 cashOutAsset={cashOutAsset} deleteAsset={deleteAsset} addTransfer={addTransfer}
               />
             )}

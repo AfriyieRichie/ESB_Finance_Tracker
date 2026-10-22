@@ -24,6 +24,7 @@ export function demoData() {
     { id: 'a2', name: 'Barclays Savings', type: 'bank', color: '#00aeef', currency: 'GBP', balance: 1600 },
     { id: 'a3', name: 'MTN MoMo',       type: 'momo', color: '#eab308', currency: 'GHS', balance: 4310.5, phone: '024 000 0000' },
     { id: 'a4', name: 'Cash',           type: 'cash', color: '#22c55e', currency: 'GHS', balance: 10000 },
+    { id: 'a5', name: 'Tithe pot (Revolut)', type: 'bank', color: '#a78bfa', currency: 'GBP', balance: 45.2, heldForOthers: true },
   ];
   const tx = (id, offset, description, amount, type, category, accountId, extra = {}) =>
     ({ id, date: day(offset), description, amount, type, category, accountId, ...extra });

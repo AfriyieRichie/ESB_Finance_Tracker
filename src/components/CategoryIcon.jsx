@@ -3,7 +3,7 @@ import {
   BookOpen, Sparkles, Package, Briefcase, TrendingUp,
   Landmark, Building2, Laptop, Shield, BarChart2, Bitcoin,
   CreditCard, Lock, Users, PieChart, Smartphone, Banknote, Wallet,
-  HandCoins, Monitor, Boxes, Megaphone, AppWindow, FileBadge, Scale, Store, Plane, Receipt, ShoppingCart, Handshake,
+  HandCoins, HandHeart, Monitor, Boxes, Megaphone, AppWindow, FileBadge, Scale, Store, Plane, Receipt, ShoppingCart, Handshake,
 } from 'lucide-react';
 
 const CATEGORY_ICONS = {
@@ -18,6 +18,7 @@ const CATEGORY_ICONS = {
   'Education':      BookOpen,
   'Personal Care':  Sparkles,
   'Debt Repayment': CreditCard,
+  'Tithe & Giving': HandHeart,
   'Other':          Package,
   // Income
   'Salary':         Briefcase,

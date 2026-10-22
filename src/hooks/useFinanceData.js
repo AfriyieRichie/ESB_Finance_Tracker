@@ -19,6 +19,7 @@ export const EXPENSE_CATEGORIES = [
   { name: 'Education',      icon: '📚', color: '#00cc6a' },
   { name: 'Personal Care',  icon: '✨', color: '#86efac' },
   { name: 'Debt Repayment', icon: '💳', color: '#f59e0b' },
+  { name: 'Tithe & Giving',  icon: '🙏', color: '#a78bfa' },
   { name: 'Other',          icon: '📦', color: '#7db896' },
 ];
 
