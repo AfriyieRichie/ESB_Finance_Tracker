@@ -916,7 +916,7 @@ function DataSection({ transactions, accounts }) {
 
 // ─── 7. Account actions ────────────────────────────────────────────────────
 
-const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','projects','preferences','pushTokens','meta'];
+const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','projects','lends','preferences','pushTokens','meta'];
 
 // Deletes every document in the user's subcollections, in batches of ≤500 (Firestore limit)
 async function wipeUserData(uid) {

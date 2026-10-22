@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, whenSaved } from '../firebase';
 import { DEMO, demoData } from '../demo';
+import { lendExpected, splitRepayment } from '../lends';
 import {
   collection, doc, addDoc, deleteDoc, setDoc, onSnapshot,
   updateDoc, increment, writeBatch, deleteField,
@@ -152,7 +153,8 @@ const ASSET_TYPE_TO_CATEGORY = {
 // from the paying account's (debtAmount / assetAmount); otherwise the tx amount applies.
 const debtAmt  = t => t.debtAmount  ?? t.amount;
 // Money coming into an account: income, or cash received from a new loan ('loan', not income)
-const isInflow = t => t.type === 'income' || t.type === 'loan';
+// 'lendrepay' = money a borrower paid back to you
+const isInflow = t => t.type === 'income' || t.type === 'loan' || t.type === 'lendrepay';
 const assetAmt = t => t.assetAmount ?? t.amount;
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
@@ -165,6 +167,7 @@ export function useFinanceData(userId) {
   const [debts,        setDebts]        = useState(demo?.debts || []);
   const [assets,       setAssets]       = useState(demo?.assets || []);
   const [projects,     setProjects]     = useState(demo?.projects || []);
+  const [lends,        setLends]        = useState(demo?.lends || []);
   const [loading,      setLoading]      = useState(!demo);
   // True once the server (not just the offline cache) has confirmed the accounts list
   const [accountsConfirmed, setAccountsConfirmed] = useState(!!demo);
@@ -174,7 +177,7 @@ export function useFinanceData(userId) {
   useEffect(() => {
     if (!userId || DEMO) return;
 
-    const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false, projects: false };
+    const loaded = { tx: false, budgets: false, accounts: false, debts: false, assets: false, projects: false, lends: false };
     const checkDone = () => { if (Object.values(loaded).every(Boolean)) { clearTimeout(slowTimer); setLoading(false); } };
 
     // A failed listener must still count as "done", otherwise the spinner never stops
@@ -212,7 +215,10 @@ export function useFinanceData(userId) {
     const unsubProjects = listen('projects', 'projects', {},
       snap => setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); unsubProjects(); };
+    const unsubLends = listen('lends', 'lends', {},
+      snap => setLends(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); unsubProjects(); unsubLends(); };
   }, [userId]);
 
   // ── Transactions ────────────────────────────────────────────────────────
@@ -264,6 +270,20 @@ export function useFinanceData(userId) {
       // Reverse debt reduction
       if (tx.debtId) {
         batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(debtAmt(tx)) });
+      }
+      // Money lent / repayments received: keep the loan record in step
+      if (tx.lendId && tx.type === 'lend') {
+        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), { principal: increment(-(tx.lendAmount ?? tx.amount)) });
+      }
+      if (tx.lendId && tx.type === 'income' && tx.lendInterest) {
+        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+          repaid: increment(-tx.lendInterest), status: 'active', closedDate: null,
+        });
+      }
+      if (tx.lendId && tx.type === 'lendrepay') {
+        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+          repaid: increment(-(tx.lendAmount ?? tx.amount)), status: 'active', closedDate: null,
+        });
       }
       // Reverse asset cost basis
       if (tx.type === 'savings' && tx.assetId) {
@@ -451,6 +471,79 @@ export function useFinanceData(userId) {
     await whenSaved(batch.commit());
   }, [userId, assets]);
 
+  // ── Money lent to others ────────────────────────────────────────────────
+
+  // Lend money: create the loan and take the money out of the account (not spending: you're owed it).
+  // payout = { accountId, amount (account currency), date, fx }
+  const addLend = useCallback(async (lend, payout) => {
+    const batch   = writeBatch(db);
+    const lendRef = doc(collection(db, 'users', userId, 'lends'));
+    batch.set(lendRef, { status: 'active', repaid: 0, ...lend });
+    if (payout) {
+      batch.set(doc(collection(db, 'users', userId, 'transactions')), {
+        ...(payout.fx || {}),
+        loggedAt:    Date.now(),
+        type:        'lend',
+        description: `Lent to ${lend.name}`,
+        category:    'Money lent',
+        amount:      payout.amount,
+        lendAmount:  lend.principal,
+        date:        payout.date,
+        accountId:   payout.accountId,
+        lendId:      lendRef.id,
+      });
+      batch.update(doc(db, 'users', userId, 'accounts', payout.accountId), { balance: increment(-payout.amount) });
+    }
+    await whenSaved(batch.commit());
+  }, [userId]);
+
+  const updateLend = useCallback(async (id, updates) => {
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'lends', id), updates));
+  }, [userId]);
+
+  // Repayment received. amount (loan currency) is split into principal and interest; the interest is
+  // recorded as income. receipt = { accountId, amount, accountAmount, date, fx }
+  const recordLendRepayment = useCallback(async (lend, receipt) => {
+    const { principalPart, interestPart } = splitRepayment(lend, receipt.amount);
+    const ratio = receipt.amount > 0 ? receipt.accountAmount / receipt.amount : 1;
+    const round = v => Math.round(v * 100) / 100;
+    const batch = writeBatch(db);
+    if (principalPart > 0) {
+      batch.set(doc(collection(db, 'users', userId, 'transactions')), {
+        ...(receipt.fx || {}), loggedAt: Date.now(),
+        type: 'lendrepay', description: `Repayment from ${lend.name}`, category: 'Loan repaid to me',
+        amount: round(principalPart * ratio), lendAmount: principalPart,
+        date: receipt.date, accountId: receipt.accountId, lendId: lend.id,
+      });
+    }
+    if (interestPart > 0) {
+      batch.set(doc(collection(db, 'users', userId, 'transactions')), {
+        ...(receipt.fx || {}), loggedAt: Date.now() + 1,
+        type: 'income', description: `Interest from ${lend.name}`, category: 'Interest',
+        amount: round(interestPart * ratio), date: receipt.date, accountId: receipt.accountId,
+        lendId: lend.id, lendInterest: interestPart,
+      });
+    }
+    batch.update(doc(db, 'users', userId, 'accounts', receipt.accountId), { balance: increment(receipt.accountAmount) });
+    const repaid = (lend.repaid || 0) + receipt.amount;
+    batch.update(doc(db, 'users', userId, 'lends', lend.id), {
+      repaid: increment(receipt.amount),
+      ...(repaid >= lendExpected(lend) - 0.005 ? { status: 'repaid', closedDate: receipt.date } : {}),
+    });
+    await whenSaved(batch.commit());
+  }, [userId]);
+
+  // Write off what's still owed: no money moves; it just stops counting towards net worth
+  const writeOffLend = useCallback(async (lend) => {
+    await whenSaved(updateDoc(doc(db, 'users', userId, 'lends', lend.id), {
+      status: 'written_off', closedDate: new Date().toISOString().slice(0, 10),
+    }));
+  }, [userId]);
+
+  const deleteLend = useCallback(async (id) => {
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'lends', id)));
+  }, [userId]);
+
   // ── Projects ────────────────────────────────────────────────────────────
 
   const addProject = useCallback(async (project) => {
@@ -553,6 +646,7 @@ export function useFinanceData(userId) {
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     addProject, updateProject, deleteProject,
+    lends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     getSpending,
   };
 }

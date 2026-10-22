@@ -125,10 +125,11 @@ function AppContent() {
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     projects, addProject, updateProject, deleteProject,
+    lends: rawLends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
   } = useFinanceData(currentUser?.uid);
 
   // ── Multi-currency: tag everything with its currency and its value in the base currency ──
-  const { transactions, accounts, debts, assets, missingRates } = useMemo(() => {
+  const { transactions, accounts, debts, assets, lends, missingRates } = useMemo(() => {
     const missing = new Set();
     const conv = (amount, cur) => {
       const v = toBase(amount || 0, cur);
@@ -148,6 +149,12 @@ function AppContent() {
       const currency = a.currency || baseCurrency;
       return { ...a, currency, baseValue: conv(a.currentValue, currency) };
     });
+    // Money lent: unpaid principal counts towards net worth while the loan is open
+    const lends = rawLends.map(l => {
+      const currency = l.currency || baseCurrency;
+      const open = (l.status || 'active') === 'active';
+      return { ...l, currency, baseOwed: open ? conv(Math.max(0, (l.principal || 0) - (l.repaid || 0)), currency) : 0 };
+    });
     const transactions = rawTransactions.map(t => {
       const currency   = t.currency || acctMap[t.accountId]?.currency || baseCurrency;
       // Use the rate saved when the transaction was recorded, so past reports don't drift
@@ -159,8 +166,8 @@ function AppContent() {
         : {};
       return { ...t, currency, baseAmount, ...extra };
     });
-    return { transactions, accounts, debts, assets, missingRates: [...missing] };
-  }, [rawTransactions, rawAccounts, rawDebts, rawAssets, baseCurrency, toBase]);
+    return { transactions, accounts, debts, assets, lends, missingRates: [...missing] };
+  }, [rawTransactions, rawAccounts, rawDebts, rawAssets, rawLends, baseCurrency, toBase]);
 
   // Option A: project (business) transactions move account balances but stay out of personal
   // budgets, spending figures and budget alerts
@@ -396,7 +403,7 @@ function AppContent() {
         ) : (
           <>
             {activeTab === 'dashboard' && (
-              <Dashboard transactions={personalTransactions} allTransactions={transactions} budgets={budgets}
+              <Dashboard transactions={personalTransactions} allTransactions={transactions} budgets={budgets} lends={lends}
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates} />
             )}
             {activeTab === 'budget' && (
@@ -416,6 +423,8 @@ function AppContent() {
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates}
                 transactions={transactions}
                 projects={projects} addProject={addProject} updateProject={updateProject} deleteProject={deleteProject}
+                lends={lends} addLend={addLend} updateLend={updateLend} recordLendRepayment={recordLendRepayment}
+                writeOffLend={writeOffLend} deleteLend={deleteLend}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt} recordLoanReceipt={recordLoanReceipt}
                 addAsset={addAsset} updateAsset={updateAsset} updateAssetValue={updateAssetValue}

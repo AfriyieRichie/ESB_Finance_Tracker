@@ -2594,3 +2594,12 @@ select optgroup {
   background: color-mix(in srgb, var(--info) 14%, transparent); color: var(--info); border: 1px solid color-mix(in srgb, var(--info) 30%, transparent); }
 .nw-held { font-size: 13px; color: var(--text-2); }
 .nw-held small { color: var(--text-3); }
+
+/* ─── Money lent ───────────────────────────────────────── */
+.tx-amount.lend { color: var(--danger); }
+.tx-amount.lendrepay, .recent-amount.lendrepay { color: var(--success); }
+.lend-overdue { color: var(--danger) !important; font-weight: 600; }
+.lend-confirm { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-2);
+  background: var(--bg-card-alt); border-radius: var(--radius-md); padding: 10px 12px; }
+.lend-confirm > div { display: flex; gap: 8px; justify-content: flex-end; }
+@media (min-width: 1100px) { .group-grid.cols-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

@@ -100,7 +100,7 @@ const PieTooltip = ({ active, payload, fmt, tipStyle }) => {
 
 // All totals here use base-currency values (baseAmount / baseBalance / baseValue) computed in App
 // `transactions` are personal only (project transactions excluded); `allTransactions` feeds the recent list
-export default function Dashboard({ transactions, allTransactions, budgets, accounts, debts, assets, missingRates = [] }) {
+export default function Dashboard({ transactions, allTransactions, budgets, accounts, debts, assets, lends = [], missingRates = [] }) {
   const { prefs, fmt, fmtCur, baseCurrency, rateFor, ratesDate } = usePreferences();
   // Effective theme ('system' is already resolved onto <html data-theme>)
   const themeAttr = document.documentElement.dataset.theme;
@@ -127,7 +127,8 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
   const totalCash        = ownAccounts.reduce((s, a) => s + (a.baseBalance || 0), 0);
   const totalInvestments = (assets  || []).filter(a => a.status === 'active' && !a.heldForOthers).reduce((s, a) => s + (a.baseValue || 0), 0);
   const totalDebts       = (debts   || []).filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
-  const netWorth         = totalCash + totalInvestments - totalDebts;
+  const totalLent        = lends.reduce((s, l) => s + (l.baseOwed || 0), 0);   // unpaid money you've lent out
+  const netWorth         = totalCash + totalInvestments + totalLent - totalDebts;
 
   // Cash per currency (base first) for the multi-currency breakdown
   const cashByCurrency = Object.entries(
@@ -430,7 +431,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
                   </span>
                 </div>
                 <span className={`recent-amount ${t.type}`}>
-                  {t.type === 'income' || t.type === 'loan' ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmtCur(t.amount, t.currency)}
+                  {['income', 'loan', 'lendrepay'].includes(t.type) ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmtCur(t.amount, t.currency)}
                 </span>
               </div>
             );

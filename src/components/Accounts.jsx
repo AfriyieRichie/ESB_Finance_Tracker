@@ -8,6 +8,8 @@ import { ProjectCard, ProjectFormModal, ProjectDetailModal } from './Projects';
 import { projectStats } from '../projects';
 import { isPaidOff, repaymentHistory } from '../debts';
 import { newestFirst, oldestFirst } from '../txOrder';
+import { LendCard, LendFormModal, LendRepayModal } from './Lends';
+import { lendOutstanding, isLendOverdue } from '../lends';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -582,7 +584,7 @@ function AccountActivityModal({ account, accounts, transactions, onClose }) {
           detail: incoming ? `Transfer from ${acctName(t.fromAccountId)}` : `Transfer to ${acctName(t.toAccountId)}`,
         };
       }
-      return { ...t, signed: (t.type === 'income' || t.type === 'loan') ? t.amount : -t.amount, detail: t.category };
+      return { ...t, signed: ['income', 'loan', 'lendrepay'].includes(t.type) ? t.amount : -t.amount, detail: t.category };
     })
     .sort(sort === 'newest' ? newestFirst : oldestFirst);
 
@@ -1001,7 +1003,7 @@ function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, 
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], lends = [], addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend, projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -1028,7 +1030,15 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
   const totalInvested    = ownAssets.reduce((s, a) => s + base(a.costBasis, a.currency), 0);
   const totalInvestments = ownAssets.reduce((s, a) => s + (a.baseValue || 0), 0);
   const investGain       = totalInvestments - totalInvested;
-  const netWorth         = totalCash + totalInvestments - totalDebts;
+  // Money lent: unpaid principal is still yours
+  const openLends    = lends.filter(l => (l.status || 'active') === 'active');
+  const closedLends  = lends.filter(l => (l.status || 'active') !== 'active')
+    .sort((a, b) => (b.closedDate || '').localeCompare(a.closedDate || ''));
+  const totalLent    = openLends.reduce((s, l) => s + (l.baseOwed || 0), 0);
+  const owedToMe     = openLends.reduce((s, l) => s + (toBase(lendOutstanding(l), l.currency) ?? 0), 0);
+  const overdueCount = openLends.filter(l => isLendOverdue(l)).length;
+  const [showClosedLends, setShowClosedLends] = useState(false);
+  const netWorth         = totalCash + totalInvestments + totalLent - totalDebts;
 
   // Cash held per currency, base currency first (shown on the Cash tile)
   const cashByCurrency = Object.entries(
@@ -1067,7 +1077,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
         <div className="nw-main">
           <span className="nw-label">Total Net Worth</span>
           <span className={`nw-value ${netWorth >= 0 ? '' : 'neg'}`}>{fmt(netWorth)}</span>
-          <span className="nw-sub">Cash + investments − debts, in {baseCurrency}</span>
+          <span className="nw-sub">Cash + investments + money lent − debts, in {baseCurrency}</span>
           {heldTotal > 0 && (
             <span className="nw-held">Held for others: {fmt(heldTotal)} <small>(not included)</small></span>
           )}
@@ -1251,9 +1261,70 @@ export default function Accounts({ accounts, debts, assets, transactions = [], p
             )}
           </div>
         )}
+        {/* ── Money lent to others ── */}
+        <GroupTile id="lent" open={openGroup === 'lent'} onToggle={toggle} title="Money lent"
+          count={openLends.length} noun="loan"
+          countLabel={openLends.length || closedLends.length ? `${openLends.length} open${closedLends.length ? ` · ${closedLends.length} closed` : ''}` : null}
+          onAdd={() => setModal({ type: 'lendForm' })} addTitle="Lend money">
+          {openLends.length === 0 ? (
+            <span className="bg-empty">{closedLends.length ? 'Nothing owed to you right now' : 'Track money you lend to others'}</span>
+          ) : (
+            <div className="bg-figures">
+              <div><span className="bs-label">Owed to you</span><span className="bg-val good">{fmt(owedToMe)}</span></div>
+              <div><span className="bs-label">People</span><span className="bg-val">{new Set(openLends.map(l => l.name.trim().toLowerCase())).size}</span></div>
+              <div><span className="bs-label">Overdue</span><span className={`bg-val ${overdueCount ? 'bad' : ''}`}>{overdueCount || '—'}</span></div>
+            </div>
+          )}
+        </GroupTile>
+        {openGroup === 'lent' && (
+          <div className="group-panel">
+            {openLends.length === 0 ? (
+              <p className="accounts-empty">
+                {closedLends.length ? 'No open loans.' : 'You haven\'t lent money to anyone.'}
+                {' '}<button type="button" className="auth-switch-link" onClick={() => setModal({ type: 'lendForm' })}>Lend money</button>
+              </p>
+            ) : (
+              <div className="acct-list">
+                {[...openLends].sort((a, b) => (isLendOverdue(b) - isLendOverdue(a)) || (a.dueDate || '9').localeCompare(b.dueDate || '9')).map(l => (
+                  <LendCard key={l.id} lend={l}
+                    onRepay={lend => setModal({ type: 'lendRepay', data: lend })}
+                    onEdit={lend => setModal({ type: 'lendForm', data: lend })}
+                    onWriteOff={writeOffLend}
+                    onDelete={lend => deleteLend(lend.id)} />
+                ))}
+              </div>
+            )}
+            {closedLends.length > 0 && (
+              <>
+                <button type="button" className={`history-toggle ${showClosedLends ? 'open' : ''}`}
+                  aria-expanded={showClosedLends} onClick={() => setShowClosedLends(v => !v)}>
+                  <span>Repaid &amp; written off ({closedLends.length})</span>
+                  <ChevronRight size={15} strokeWidth={1.8} className="bg-chevron" />
+                </button>
+                {showClosedLends && (
+                  <div className="acct-list">
+                    {closedLends.map(l => (
+                      <LendCard key={l.id} lend={l} onRepay={() => {}} onEdit={() => {}} onWriteOff={() => {}}
+                        onDelete={lend => deleteLend(lend.id)} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Modals ── */}
+      {modal?.type === 'lendForm' && (
+        <LendFormModal existing={modal.data} accounts={accounts}
+          onSave={modal.data ? (u) => updateLend(modal.data.id, u) : addLend}
+          onClose={close} />
+      )}
+      {modal?.type === 'lendRepay' && (
+        <LendRepayModal lend={lends.find(l => l.id === modal.data.id) || modal.data} accounts={accounts}
+          onSave={recordLendRepayment} onClose={close} />
+      )}
       {modal?.type === 'account' && (
         <AccountModal
           existing={modal.data}
