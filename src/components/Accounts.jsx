@@ -10,6 +10,7 @@ import { isPaidOff, repaymentHistory } from '../debts';
 import { newestFirst, oldestFirst } from '../txOrder';
 import { LendCard, LendFormModal, LendRepayModal } from './Lends';
 import { lendOutstanding, isLendOverdue } from '../lends';
+import { useConfirm } from './Confirm';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1007,6 +1008,23 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
+  const [confirm, confirmDialog] = useConfirm();
+  const ask = (title, message) => confirm({ title, message });
+  const confirmDeleteAccount = async (id) => {
+    const a = accounts.find(x => x.id === id); if (!a) return;
+    const n = transactions.filter(t => t.accountId === id || t.toAccountId === id).length;
+    if (await ask(`Delete ${a.name}?`,
+      `Its balance (${fmtCur(a.balance, a.currency)}) will no longer count towards your totals.` +
+      (n ? ` Its ${n} transaction${n === 1 ? '' : 's'} stay in your history.` : '') + ' This can\'t be undone.')) deleteAccount(id);
+  };
+  const confirmDeleteDebt = async (id) => {
+    const d = debts.find(x => x.id === id); if (!d) return;
+    if (await ask(`Delete ${d.name}?`, 'The debt record is removed. Repayments already recorded stay in your transactions. This can\'t be undone.')) deleteDebt(id);
+  };
+  const confirmDeleteAsset = async (id) => {
+    const a = assets.find(x => x.id === id); if (!a) return;
+    if (await ask(`Delete ${a.name}?`, `Its value (${fmtCur(a.currentValue, a.currency)}) will no longer count towards your net worth. Transactions already recorded stay in your history. This can't be undone.`)) deleteAsset(id);
+  };
 
   // ── Totals per group, in the base currency ────────────────────────────
   const activeAssets = assets.filter(a => a.status === 'active');
@@ -1124,7 +1142,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                     key={a.id}
                     account={a}
                     onEdit={acct => setModal({ type: 'account', data: acct })}
-                    onDelete={deleteAccount}
+                    onDelete={confirmDeleteAccount}
                     onReconcile={acct => setModal({ type: 'reconcile', data: acct })}
                     onOpen={acct => setModal({ type: 'activity', data: acct })}
                   />
@@ -1168,7 +1186,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                     key={d.id}
                     debt={d}
                     onEdit={debt => setModal({ type: 'debt', data: debt })}
-                    onDelete={deleteDebt}
+                    onDelete={confirmDeleteDebt}
                   />
                 ))}
               </div>
@@ -1183,7 +1201,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                 {showPaidDebts && (
                   <div className="acct-list">
                     {paidDebts.map(d => (
-                      <PaidDebtCard key={d.id} debt={d} transactions={transactions} onDelete={deleteDebt} />
+                      <PaidDebtCard key={d.id} debt={d} transactions={transactions} onDelete={confirmDeleteDebt} />
                     ))}
                   </div>
                 )}
@@ -1222,7 +1240,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                     asset={a}
                     onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
                     onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
-                    onDelete={deleteAsset}
+                    onDelete={confirmDeleteAsset}
                     onToggleHeld={(asset, v) => updateAsset(asset.id, { heldForOthers: v })}
                   />
                 ))}
@@ -1382,6 +1400,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
       {modal?.type === 'cashOut' && (
         <CashOutModal asset={modal.data} accounts={accounts} onCashOut={cashOutAsset} onClose={close} />
       )}
+      {confirmDialog}
     </div>
   );
 }

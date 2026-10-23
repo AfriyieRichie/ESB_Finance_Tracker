@@ -7,6 +7,7 @@ import {
 import { useFmt, usePreferences, useEffectiveCategoriesForType } from '../contexts/PreferencesContext';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
+import { useConfirm } from './Confirm';
 
 // Wording per budget type: what "used" and "left" mean, and whether going over is good or bad
 const GROUPS = [
@@ -90,6 +91,7 @@ function BudgetModal({ month, existing, defaultType = 'expense', onSave, onClose
 
 export default function Budget({ budgets, transactions, upsertBudget, deleteBudget }) {
   const fmt = useFmt();
+  const [confirm, confirmDialog] = useConfirm();
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -253,7 +255,9 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
                             </div>
                             <div className="bc-actions">
                               <button className="icon-btn edit-btn" onClick={() => openEdit(b)} title="Edit">✎</button>
-                              <button className="icon-btn delete-btn" onClick={() => deleteBudget(b.id)} title="Delete">✕</button>
+                              <button className="icon-btn delete-btn" title="Delete" onClick={async () => {
+                                if (await confirm({ title: `Delete the ${b.category} budget?`, message: `Your ${fmt(b.amount)} budget for ${monthName} is removed. Transactions aren't affected.` })) deleteBudget(b.id);
+                              }}>✕</button>
                             </div>
                           </div>
 
@@ -304,6 +308,7 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
           onClose={() => setShowModal(false)}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -707,7 +707,66 @@ function SecuritySection() {
 
 // ─── 6. Data ───────────────────────────────────────────────────────────────
 
-function DataSection({ transactions, accounts }) {
+function DeletedTransactions({ accounts, listDeletedTransactions, restoreTransaction, forgetDeletedTransaction }) {
+  const { fmtCur } = usePreferences();
+  const [items, setItems] = useState(null);   // null = not loaded
+  const [busyId, setBusyId] = useState(null);
+  const [msg, setMsg] = useState('');
+  const acctName = (id) => accounts.find(a => a.id === id)?.name;
+  const load = async () => { setMsg(''); setItems(await listDeletedTransactions()); };
+  const restorable = (d) => ['income', 'expense', 'savings', 'transfer'].includes(d.type)
+    && (d.type === 'transfer' ? acctName(d.fromAccountId) && acctName(d.toAccountId) : acctName(d.accountId));
+
+  const restore = async (d) => {
+    setBusyId(d.id); setMsg('');
+    try { await restoreTransaction(d); setItems(list => list.filter(x => x.id !== d.id)); setMsg(`Restored "${d.description}".`); }
+    catch (e) { setMsg(e.message || 'Could not restore that transaction.'); }
+    setBusyId(null);
+  };
+  const forget = async (d) => {
+    if (!window.confirm(`Remove "${d.description}" from the trail permanently?`)) return;
+    setBusyId(d.id); await forgetDeletedTransaction(d.id); setItems(list => list.filter(x => x.id !== d.id)); setBusyId(null);
+  };
+
+  return (
+    <>
+      <SettingsRow label="Deleted transactions" hint="Every deleted transaction is kept here so you can check or restore it">
+        <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={() => (items ? setItems(null) : load())}>
+          {items ? 'Hide' : 'View'}
+        </button>
+      </SettingsRow>
+      {items && (
+        <div className="deleted-list">
+          {msg && <p className="settings-row-hint settings-note">{msg}</p>}
+          {items.length === 0 ? (
+            <p className="settings-row-hint settings-note">No deleted transactions.</p>
+          ) : items.map(d => (
+            <div key={d.id} className="deleted-row">
+              <div className="deleted-info">
+                <span className="deleted-desc">{d.description || '(no description)'}</span>
+                <small>
+                  {d.date} · {d.type === 'transfer'
+                    ? `${acctName(d.fromAccountId) || 'deleted account'} → ${acctName(d.toAccountId) || 'deleted account'}`
+                    : `${d.category || d.type} · ${acctName(d.accountId) || 'deleted account'}`}
+                  {' · '}deleted {new Date(d.deletedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </small>
+              </div>
+              <span className="deleted-amt">{fmtCur(d.amount, d.currency)}</span>
+              <div className="deleted-actions">
+                {restorable(d)
+                  ? <button type="button" className="btn-ghost" disabled={busyId === d.id} onClick={() => restore(d)}>Restore</button>
+                  : <span className="deleted-norestore" title="Its account no longer exists, or this kind of entry must be re-entered from its own screen">Can't restore</span>}
+                <button type="button" className="icon-btn delete-btn" disabled={busyId === d.id} onClick={() => forget(d)} title="Remove from trail">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function DataSection({ transactions, accounts, trail }) {
   const [importing, setImporting]   = useState(false);
   const [preview,   setPreview]     = useState(null); // { valid, invalid }
   const [importBusy, setImportBusy] = useState(false);
@@ -830,6 +889,7 @@ function DataSection({ transactions, accounts }) {
 
   return (
     <Section icon={Database} title="Data">
+      <DeletedTransactions accounts={accounts} {...trail} />
       <SettingsRow label="Export CSV" hint="Download all transactions as a spreadsheet">
         <button type="button" className="btn-ghost" style={{ fontSize: 13 }} onClick={exportCSV}>
           <Download size={13} strokeWidth={1.6} /> Export
@@ -916,7 +976,7 @@ function DataSection({ transactions, accounts }) {
 
 // ─── 7. Account actions ────────────────────────────────────────────────────
 
-const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','projects','lends','preferences','pushTokens','meta'];
+const USER_COLLECTIONS = ['transactions','budgets','accounts','debts','assets','projects','lends','deletedTransactions','preferences','pushTokens','meta'];
 
 // Deletes every document in the user's subcollections, in batches of ≤500 (Firestore limit)
 async function wipeUserData(uid) {
@@ -1084,7 +1144,7 @@ const SETTINGS_PAGES = [
   { id: 'account',       title: 'Account',            icon: User,           desc: 'Profile, sign out, reset or delete' },
 ];
 
-export default function Settings({ currentUser, logout, transactions, accounts, debts, assets, addTransaction }) {
+export default function Settings({ currentUser, logout, transactions, accounts, debts, assets, addTransaction, listDeletedTransactions, restoreTransaction, forgetDeletedTransaction }) {
   // Expose addTransaction for the import confirm callback
   window.__addTransaction = addTransaction;
 
@@ -1129,7 +1189,8 @@ export default function Settings({ currentUser, logout, transactions, accounts, 
           {page.id === 'categories'    && <ManageCategoriesSection assets={assets} />}
           {page.id === 'notifications' && <NotificationsSection />}
           {page.id === 'security'      && <SecuritySection />}
-          {page.id === 'data'          && <DataSection transactions={transactions} accounts={accounts} />}
+          {page.id === 'data'          && <DataSection transactions={transactions} accounts={accounts}
+            trail={{ listDeletedTransactions, restoreTransaction, forgetDeletedTransaction }} />}
           {page.id === 'account'       && (<>
             <ProfileSection currentUser={currentUser} />
             <AccountSection logout={logout} />

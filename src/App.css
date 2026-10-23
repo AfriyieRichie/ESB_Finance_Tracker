@@ -2603,3 +2603,24 @@ select optgroup {
   background: var(--bg-card-alt); border-radius: var(--radius-md); padding: 10px 12px; }
 .lend-confirm > div { display: flex; gap: 8px; justify-content: flex-end; }
 @media (min-width: 1100px) { .group-grid.cols-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ─── Confirm dialog & deleted-transactions trail ──────── */
+.confirm-modal { max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+.confirm-modal h3 { font-size: 17px; color: var(--text-1); }
+.confirm-msg { font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.btn-primary.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.deleted-list { display: flex; flex-direction: column; padding: 0 12px 10px; }
+.deleted-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+  padding: 10px 8px; border-bottom: 1px solid var(--border); }
+.deleted-row:last-child { border-bottom: none; }
+.deleted-info { display: flex; flex-direction: column; min-width: 0; }
+.deleted-desc { font-size: 14px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deleted-info small { font-size: 12px; color: var(--text-3); }
+.deleted-amt { font-size: 13.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; }
+.deleted-actions { display: flex; gap: 6px; align-items: center; }
+.deleted-actions .btn-ghost { font-size: 12.5px; padding: 5px 12px; }
+.deleted-norestore { font-size: 11.5px; color: var(--text-3); }
+@media (max-width: 600px) {
+  .deleted-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .deleted-actions { grid-column: 1 / -1; justify-content: flex-end; }
+}

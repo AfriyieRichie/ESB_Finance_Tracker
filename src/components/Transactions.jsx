@@ -17,6 +17,7 @@ import { BaseApprox } from './CurrencySelect';
 import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 import { newestFirst } from '../txOrder';
+import { useConfirm } from './Confirm';
 
 function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, projects = [], addTransfer, budgets, existing }) {
   const { fmtCur, convert, txFxMeta } = usePreferences();
@@ -438,6 +439,7 @@ const TYPE_FILTER_OPTIONS = [
 
 export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, projects = [], addTransfer, budgets }) {
   const { fmt, fmtCur } = usePreferences();
+  const [confirm, confirmDialog] = useConfirm();
   const expenseCats = useEffectiveCategoriesForType('expense');
   const incomeCats  = useEffectiveCategoriesForType('income');
   const savingsCats = useEffectiveCategoriesForType('savings');
@@ -609,7 +611,12 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                           <Pencil size={13} strokeWidth={1.6} />
                         </button>
                       )}
-                      <button className="icon-btn delete-btn" onClick={() => deleteTransaction(t.id)} title="Delete">✕</button>
+                      <button className="icon-btn delete-btn" title="Delete" onClick={async () => {
+                        if (await confirm({
+                          title: 'Delete this transaction?',
+                          message: `"${t.description}" (${fmtCur(t.amount, t.currency)}, ${t.date}). Its effect on your balances will be reversed. You can restore it later from Settings → Data → Deleted transactions.`,
+                        })) deleteTransaction(t.id);
+                      }}>✕</button>
                     </td>
                   </tr>
                 );
@@ -636,6 +643,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
           addTransfer={addTransfer} budgets={budgets}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

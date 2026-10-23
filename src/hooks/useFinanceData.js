@@ -4,7 +4,7 @@ import { DEMO, demoData } from '../demo';
 import { lendExpected, splitRepayment } from '../lends';
 import {
   collection, doc, addDoc, deleteDoc, setDoc, onSnapshot,
-  updateDoc, increment, writeBatch, deleteField,
+  updateDoc, increment, writeBatch, deleteField, getDocs,
 } from 'firebase/firestore';
 
 // ─── Expense Categories ────────────────────────────────────────────────────
@@ -255,6 +255,9 @@ export function useFinanceData(userId) {
     if (!tx) return;
 
     const batch = writeBatch(db);
+    // Keep a copy in the deleted-transactions trail (Settings → Data) so it can be reviewed or restored
+    const { id: _omit, ...copy } = tx;
+    batch.set(doc(db, 'users', userId, 'deletedTransactions', id), { ...copy, deletedAt: Date.now() });
     batch.delete(doc(db, 'users', userId, 'transactions', id));
 
     if (tx.type === 'transfer') {
@@ -322,6 +325,30 @@ export function useFinanceData(userId) {
 
     await whenSaved(batch.commit());
   }, [userId]);
+
+  // ── Deleted transactions trail ──────────────────────────────────────────
+
+  const listDeletedTransactions = useCallback(async () => {
+    const snap = await getDocs(collection(db, 'users', userId, 'deletedTransactions'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+  }, [userId]);
+
+  const forgetDeletedTransaction = useCallback(async (id) => {
+    await whenSaved(deleteDoc(doc(db, 'users', userId, 'deletedTransactions', id)));
+  }, [userId]);
+
+  // Put a deleted transaction back (re-applying its effect on balances, debts and investments)
+  const restoreTransaction = useCallback(async (d) => {
+    if (!['income', 'expense', 'savings', 'transfer'].includes(d.type)) throw new Error('This kind of transaction can\'t be restored automatically.');
+    const { id, deletedAt, baseAmount, ...tx } = d;   // eslint-disable-line no-unused-vars
+    if (d.type === 'transfer') {
+      const { fromAccountId, toAccountId, amount, toAmount, description, date, ...meta } = tx;
+      await addTransfer({ fromAccountId, toAccountId, amount, toAmount, description, date, ...meta });
+    } else {
+      await addTransaction(tx);
+    }
+    await forgetDeletedTransaction(id);
+  }, [addTransaction, addTransfer, forgetDeletedTransaction]);
 
   // ── Budgets ─────────────────────────────────────────────────────────────
 
@@ -647,6 +674,7 @@ export function useFinanceData(userId) {
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     addProject, updateProject, deleteProject,
     lends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
+    listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
     getSpending,
   };
 }

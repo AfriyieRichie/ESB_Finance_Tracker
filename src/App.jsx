@@ -126,6 +126,7 @@ function AppContent() {
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     projects, addProject, updateProject, deleteProject,
     lends: rawLends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
+    listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
   } = useFinanceData(currentUser?.uid);
 
   // ── Multi-currency: tag everything with its currency and its value in the base currency ──
@@ -436,6 +437,8 @@ function AppContent() {
                 currentUser={currentUser} logout={logout}
                 transactions={transactions} accounts={accounts}
                 debts={debts} assets={assets}
+                listDeletedTransactions={listDeletedTransactions} restoreTransaction={restoreTransaction}
+                forgetDeletedTransaction={forgetDeletedTransaction}
                 addTransaction={addTransaction}
               />
             )}
