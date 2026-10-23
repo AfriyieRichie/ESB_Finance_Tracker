@@ -125,7 +125,7 @@ function AppContent() {
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     projects, addProject, updateProject, deleteProject,
-    lends: rawLends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
+    lends: rawLends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
   } = useFinanceData(currentUser?.uid);
 
@@ -424,7 +424,7 @@ function AppContent() {
                 accounts={accounts} debts={debts} assets={assets} missingRates={missingRates}
                 transactions={transactions}
                 projects={projects} addProject={addProject} updateProject={updateProject} deleteProject={deleteProject}
-                lends={lends} addLend={addLend} updateLend={updateLend} recordLendRepayment={recordLendRepayment}
+                lends={lends} addLend={addLend} lendMore={lendMore} updateLend={updateLend} recordLendRepayment={recordLendRepayment}
                 writeOffLend={writeOffLend} deleteLend={deleteLend}
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt} recordLoanReceipt={recordLoanReceipt}

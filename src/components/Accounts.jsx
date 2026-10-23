@@ -8,7 +8,7 @@ import { ProjectCard, ProjectFormModal, ProjectDetailModal } from './Projects';
 import { projectStats } from '../projects';
 import { isPaidOff, repaymentHistory } from '../debts';
 import { newestFirst, oldestFirst } from '../txOrder';
-import { LendCard, LendFormModal, LendRepayModal } from './Lends';
+import { LendCard, LendFormModal, LendRepayModal, LendMoreModal } from './Lends';
 import { lendOutstanding, isLendOverdue } from '../lends';
 import { useConfirm } from './Confirm';
 
@@ -1004,7 +1004,7 @@ function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, 
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], lends = [], addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend, projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], lends = [], addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend, projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -1306,6 +1306,8 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                 {[...openLends].sort((a, b) => (isLendOverdue(b) - isLendOverdue(a)) || (a.dueDate || '9').localeCompare(b.dueDate || '9')).map(l => (
                   <LendCard key={l.id} lend={l}
                     onRepay={lend => setModal({ type: 'lendRepay', data: lend })}
+                    onMore={lend => setModal({ type: 'lendMore', data: lend })}
+                    payouts={transactions.filter(t => t.lendId === l.id && t.type === 'lend').length}
                     onEdit={lend => setModal({ type: 'lendForm', data: lend })}
                     onWriteOff={writeOffLend}
                     onDelete={lend => deleteLend(lend.id)} />
@@ -1338,6 +1340,10 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
         <LendFormModal existing={modal.data} accounts={accounts}
           onSave={modal.data ? (u) => updateLend(modal.data.id, u) : addLend}
           onClose={close} />
+      )}
+      {modal?.type === 'lendMore' && (
+        <LendMoreModal lend={lends.find(l => l.id === modal.data.id) || modal.data} accounts={accounts}
+          onSave={lendMore} onClose={close} />
       )}
       {modal?.type === 'lendRepay' && (
         <LendRepayModal lend={lends.find(l => l.id === modal.data.id) || modal.data} accounts={accounts}

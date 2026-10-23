@@ -276,7 +276,10 @@ export function useFinanceData(userId) {
       }
       // Money lent / repayments received: keep the loan record in step
       if (tx.lendId && tx.type === 'lend') {
-        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), { principal: increment(-(tx.lendAmount ?? tx.amount)) });
+        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+          principal: increment(-(tx.lendAmount ?? tx.amount)),
+          ...(tx.lendExpectedAdd ? { expected: increment(-tx.lendExpectedAdd) } : {}),
+        });
       }
       if (tx.lendId && tx.type === 'income' && tx.lendInterest) {
         batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
@@ -524,6 +527,29 @@ export function useFinanceData(userId) {
     await whenSaved(batch.commit());
   }, [userId]);
 
+  // Lend more to the same person on the same loan. extra = { amount (loan currency), interest
+  // (extra amount expected back, loan currency), accountId, accountAmount, date, fx }
+  const lendMore = useCallback(async (lend, extra) => {
+    const batch = writeBatch(db);
+    // Only loans that already track an "expected back" total (or now get interest) need it raised
+    const expectedAdd = (lend.expected > 0 || extra.interest > 0) ? extra.amount + (extra.interest || 0) : 0;
+    batch.set(doc(collection(db, 'users', userId, 'transactions')), {
+      ...(extra.fx || {}), loggedAt: Date.now(),
+      type: 'lend', description: `Lent more to ${lend.name}`, category: 'Money lent',
+      amount: extra.accountAmount, lendAmount: extra.amount,
+      ...(expectedAdd ? { lendExpectedAdd: expectedAdd } : {}),
+      date: extra.date, accountId: extra.accountId, lendId: lend.id,
+    });
+    batch.update(doc(db, 'users', userId, 'accounts', extra.accountId), { balance: increment(-extra.accountAmount) });
+    batch.update(doc(db, 'users', userId, 'lends', lend.id), {
+      principal: increment(extra.amount),
+      ...(expectedAdd
+        ? (lend.expected > 0 ? { expected: increment(expectedAdd) } : { expected: (lend.principal || 0) + expectedAdd })
+        : {}),
+    });
+    await whenSaved(batch.commit());
+  }, [userId]);
+
   const updateLend = useCallback(async (id, updates) => {
     await whenSaved(updateDoc(doc(db, 'users', userId, 'lends', id), updates));
   }, [userId]);
@@ -673,7 +699,7 @@ export function useFinanceData(userId) {
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
     addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
     addProject, updateProject, deleteProject,
-    lends, addLend, updateLend, recordLendRepayment, writeOffLend, deleteLend,
+    lends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
     getSpending,
   };

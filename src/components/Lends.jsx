@@ -210,7 +210,7 @@ export function LendRepayModal({ lend, accounts, onSave, onClose }) {
 
 // ─── Card ─────────────────────────────────────────────────────────────────
 
-export function LendCard({ lend, onRepay, onEdit, onWriteOff, onDelete }) {
+export function LendCard({ lend, payouts = 0, onRepay, onMore, onEdit, onWriteOff, onDelete }) {
   const { fmtCur } = usePreferences();
   const [confirm, setConfirm] = useState(null);   // 'writeoff' | 'delete'
   const fmt = (v) => fmtCur(v, lend.currency);
@@ -226,7 +226,7 @@ export function LendCard({ lend, onRepay, onEdit, onWriteOff, onDelete }) {
         <div>
           <p className="debt-name">{lend.status === 'repaid' ? '✓ ' : ''}{lend.name}</p>
           <p className="debt-meta">
-            Lent {fmt(lend.principal)} on {fmtDate(lend.startDate)}
+            Lent {fmt(lend.principal)}{payouts > 1 ? ` in ${payouts} payments, first` : ''} on {fmtDate(lend.startDate)}
             {lend.expected > lend.principal ? ` · ${fmt(lend.expected - lend.principal)} interest` : ''}
           </p>
           {open && lend.dueDate && (
@@ -271,9 +271,95 @@ export function LendCard({ lend, onRepay, onEdit, onWriteOff, onDelete }) {
       ) : open && (
         <div className="asset-card-actions">
           <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px', color: 'var(--success)' }} onClick={() => onRepay(lend)}>Record repayment</button>
+          {onMore && <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => onMore(lend)}>Lend more</button>}
           <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => setConfirm('writeoff')}>Write off</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Lend more on an existing loan ────────────────────────────────────────
+
+export function LendMoreModal({ lend, accounts, onSave, onClose }) {
+  const { convert, fmtCur, txFxMeta } = usePreferences();
+  const [amount,   setAmount]   = useState('');
+  const [interest, setInterest] = useState('');
+  const [acctId,   setAcctId]   = useState('');
+  const [sent,     setSent]     = useState('');
+  const [sentTouched, setSentTouched] = useState(false);
+  const [date,     setDate]     = useState(today());
+  const [busy,     setBusy]     = useState(false);
+
+  const account  = accounts.find(a => a.id === acctId);
+  const crossCur = account && account.currency !== lend.currency;
+  const suggest = (aid, amt = amount) => {
+    const a = accounts.find(x => x.id === aid);
+    const v = parseFloat(amt);
+    if (!a || !(v > 0)) return '';
+    const out = a.currency === lend.currency ? v : convert(v, lend.currency, a.currency);
+    return out === null ? '' : String(round2(out));
+  };
+  const amt = parseFloat(amount) || 0;
+  const newOwed = lendOutstanding(lend) + amt + (parseFloat(interest) || 0);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!(amt > 0) || !account) return;
+    setBusy(true);
+    await onSave(lend, {
+      amount: amt, interest: parseFloat(interest) || 0,
+      accountId: acctId, accountAmount: crossCur ? (parseFloat(sent) || 0) : amt,
+      date, fx: txFxMeta(account.currency),
+    });
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Lend more to {lend.name}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={submit} className="modal-form">
+          <p className="fx-hint">Currently owed: <b>{fmtCur(lendOutstanding(lend), lend.currency)}</b>. The extra amount is added to this same loan.</p>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Extra amount lent ({symbolFor(lend.currency)})</label>
+              <input type="number" min="0.01" step="0.01" value={amount} autoFocus
+                onChange={e => { setAmount(e.target.value); if (!sentTouched) setSent(suggest(acctId, e.target.value)); }} required />
+            </div>
+            <div className="form-group">
+              <label>Extra interest ({symbolFor(lend.currency)}, optional)</label>
+              <input type="number" min="0" step="0.01" placeholder="0.00" value={interest} onChange={e => setInterest(e.target.value)} />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Paid from account</label>
+            <select value={acctId} onChange={e => { setAcctId(e.target.value); if (!sentTouched) setSent(suggest(e.target.value)); }} required>
+              <option value="">— Select account —</option>
+              {accounts.filter(a => !a.heldForOthers).map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}
+            </select>
+          </div>
+          {crossCur && (
+            <div className="form-group">
+              <label>Amount that left {account.name} ({symbolFor(account.currency)})</label>
+              <input type="number" min="0.01" step="0.01" value={sent}
+                onChange={e => { setSent(e.target.value); setSentTouched(true); }} required />
+            </div>
+          )}
+          <div className="form-group">
+            <label>Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+          </div>
+          {amt > 0 && <p className="fx-hint">New amount owed: <b>{fmtCur(newOwed, lend.currency)}</b></p>}
+          <div className="form-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>Lend More</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
