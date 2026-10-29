@@ -718,6 +718,7 @@ function PaidDebtCard({ debt, transactions, onDelete }) {
           <p className="debt-name">✓ {debt.name}</p>
           <p className="debt-meta">
             Paid off{when ? ` on ${when}` : ''}
+            {debt.settlementDiscount > 0 ? ` · settled early, saved ${fmt(debt.settlementDiscount)}` : ''}
             {h.months !== null && h.count > 1 ? ` · took ${h.months === 0 ? 'under a month' : `${h.months} month${h.months === 1 ? '' : 's'}`}` : ''}
           </p>
         </div>
@@ -734,7 +735,7 @@ function PaidDebtCard({ debt, transactions, onDelete }) {
   );
 }
 
-function DebtCard({ debt, onEdit, onDelete }) {
+function DebtCard({ debt, onEdit, onDelete, onSettle }) {
   const { fmtCur } = usePreferences();
   const fmt = (v) => fmtCur(v, debt.currency);
   const original = debt.originalAmount || debt.currentBalance;
@@ -770,6 +771,11 @@ function DebtCard({ debt, onEdit, onDelete }) {
       </div>
       {debt.monthlyPayment && (
         <p className="debt-meta" style={{ marginTop: 4 }}>Monthly payment: {fmt(debt.monthlyPayment)}</p>
+      )}
+      {onSettle && (
+        <div className="asset-card-actions">
+          <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px', color: 'var(--success)' }} onClick={() => onSettle(debt)}>Mark as paid off</button>
+        </div>
       )}
     </div>
   );
@@ -1021,6 +1027,13 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
     const d = debts.find(x => x.id === id); if (!d) return;
     if (await ask(`Delete ${d.name}?`, 'The debt record is removed. Repayments already recorded stay in your transactions. This can\'t be undone.')) deleteDebt(id);
   };
+  // Settle a debt early: the lender accepted less than the balance, so the rest is written off
+  const confirmSettleDebt = async (d) => {
+    const left = Number(d.currentBalance) || 0;
+    if (await confirm({ title: `Mark ${d.name} as paid off?`, confirmLabel: 'Mark paid off', danger: false,
+      message: `The remaining ${fmtCur(left, d.currency)} is cleared as an early-settlement discount. No money moves between your accounts.` }))
+      updateDebt(d.id, { currentBalance: 0, settlementDiscount: Math.round(left * 100) / 100 });
+  };
   const confirmDeleteAsset = async (id) => {
     const a = assets.find(x => x.id === id); if (!a) return;
     if (await ask(`Delete ${a.name}?`, `Its value (${fmtCur(a.currentValue, a.currency)}) will no longer count towards your net worth. Transactions already recorded stay in your history. This can't be undone.`)) deleteAsset(id);
@@ -1187,6 +1200,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                     debt={d}
                     onEdit={debt => setModal({ type: 'debt', data: debt })}
                     onDelete={confirmDeleteDebt}
+                    onSettle={confirmSettleDebt}
                   />
                 ))}
               </div>

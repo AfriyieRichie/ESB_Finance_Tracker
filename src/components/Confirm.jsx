@@ -14,7 +14,7 @@ export function useConfirm() {
         {state.message && <p className="confirm-msg">{state.message}</p>}
         <div className="form-actions">
           <button type="button" className="btn-secondary" onClick={() => close(false)} autoFocus>Cancel</button>
-          <button type="button" className="btn-primary btn-danger" onClick={() => close(true)}>
+          <button type="button" className={`btn-primary${state.danger === false ? '' : ' btn-danger'}`} onClick={() => close(true)}>
             {state.confirmLabel || 'Delete'}
           </button>
         </div>
