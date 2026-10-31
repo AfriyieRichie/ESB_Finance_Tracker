@@ -2,7 +2,7 @@ import { cloneElement, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Download } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, PieChart, Pie, Cell,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
 import { usePreferences } from '../contexts/PreferencesContext';
 import MonthPicker, { shiftMonth } from './MonthPicker';
@@ -52,7 +52,7 @@ function Bars({ rows }) {
   );
 }
 
-export default function Reports({ transactions, allTransactions, budgets, accounts, debts, assets, lends, missingRates = [], userName }) {
+export default function Reports({ transactions, allTransactions, budgets, accounts, debts, assets, lends, snapshots = [], missingRates = [], userName }) {
   const { prefs, fmt, fmtCur, baseCurrency } = usePreferences();
   const today     = isoDate(new Date());
   const thisMonth = today.slice(0, 7);
@@ -75,7 +75,7 @@ export default function Reports({ transactions, allTransactions, budgets, accoun
 
   const badDates = kind === 'custom' && (!from || !to || from > to || from > today);
   const period = kind === 'quarter' ? quarterPeriod(quarter) : kind === 'custom' ? customPeriod(from, to) : monthPeriod(month);
-  const report = badDates ? null : buildReport({ period, transactions, budgets, accounts, debts, assets, lends, fmt, fmtCur, today });
+  const report = badDates ? null : buildReport({ period, transactions, budgets, accounts, debts, assets, lends, snapshots, baseCurrency, fmt, fmtCur, today });
 
   // The saved PDF is always on white, whichever theme the app is in, and is named after the period
   const pageTitle = useRef(document.title);
@@ -143,7 +143,11 @@ export default function Reports({ transactions, allTransactions, budgets, accoun
   }
   if (report.empty) return shell(<div className="chart-card report-empty"><p>No transactions recorded for {period.label}.</p></div>);
 
-  const { totals, changes, comments, position, debt, budget } = report;
+  const { totals, changes, comments, position, debt, budget, history } = report;
+  const netWorthTrend = history.points.map(s => ({
+    label: new Date(`${s.month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }),
+    netWorth: s.netWorth,
+  }));
   const projectCount = allTransactions.filter(t => t.projectId && t.date >= period.start && t.date <= report.end).length;
   const donut = toDonutSlices(report.categories.map(c => [c.name, c.value]), theme);
   const palette = DONUT_PALETTE[theme];
@@ -274,10 +278,27 @@ export default function Reports({ transactions, allTransactions, budgets, accoun
           <Stat label="Investments and money lent" value={fmt(position.investments + position.lent)} />
           <Stat label="Debts" value={fmt(position.debts)} />
         </div>
+        {comments.position.length > 0 && <div style={{ marginTop: 16 }}><Comments items={comments.position} /></div>}
+        <h3>Net worth over time</h3>
+        {netWorthTrend.length < 2 ? (
+          <p className="report-sub">Your app now saves your net worth each month, so this chart will appear once there are two months to show.</p>
+        ) : (
+          <div className="report-chart">
+            <Chart printing={printing} width={640} height={240}>
+              <AreaChart data={netWorthTrend} margin={{ top: 6, right: 18, left: -8, bottom: 0 }}>
+                <CartesianGrid stroke={ct.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: ct.tick, fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={8} />
+                <YAxis tick={{ fill: ct.tick, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={compact} width={44} domain={['auto', 'auto']} />
+                <Area dataKey="netWorth" name="Net worth" stroke={ct.income} fill={ct.income} fillOpacity={0.15} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              </AreaChart>
+            </Chart>
+          </div>
+        )}
       </section>
 
       <p className="report-foot">
-        These are today's balances, not balances at the end of the period. Money you hold for others isn't included in them.
+        The figures above the chart are today's balances, not balances at the end of the period. Money you hold for others isn't included.
+        {netWorthTrend.length > 1 && ' Each month on the chart shows your position the last time the app was opened that month.'}
         {projectCount > 0 && ` ${projectCount} business project transaction${projectCount === 1 ? ' is' : 's are'} left out of this report.`}
         {' '}Income and spending match your Dashboard. Comments are generated from your records and aren't financial advice.
       </p>

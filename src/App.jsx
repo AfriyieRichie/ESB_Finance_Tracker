@@ -17,6 +17,7 @@ import { notify, registerPush } from './notifications';
 import { DEMO } from './demo';
 import { isPersonal } from './projects';
 import { isPaidOff } from './debts';
+import { isoDate, netPosition } from './reports';
 import './App.css';
 
 const TABS = [
@@ -129,6 +130,7 @@ function AppContent() {
     projects, addProject, updateProject, deleteProject,
     lends: rawLends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
+    snapshots, saveSnapshot,
   } = useFinanceData(currentUser?.uid);
 
   // ── Multi-currency: tag everything with its currency and its value in the base currency ──
@@ -210,6 +212,21 @@ function AppContent() {
       }
     }
   }, [loading, rawDebts, rawTransactions, updateDebt]);
+
+  // Keep this month's net worth snapshot current; past months stay as they closed. Reports can't
+  // work out past balances, so only save figures that are complete and confirmed by the server.
+  useEffect(() => {
+    if (DEMO || loading || prefsLoading || !accountsConfirmed || loadIssue || !snapshots) return;
+    if (missingRates.length || !accounts.length) return;
+    const date  = isoDate(new Date());
+    const month = date.slice(0, 7);
+    const round = v => Math.round(v * 100) / 100;
+    const p = netPosition({ accounts, assets, lends, debts });
+    const figures = { netWorth: round(p.netWorth), cash: round(p.cash), investments: round(p.investments), lent: round(p.lent), debts: round(p.debts) };
+    const saved = snapshots.find(s => s.id === month);
+    if (saved?.baseCurrency === baseCurrency && Object.keys(figures).every(k => saved[k] === figures[k])) return;
+    saveSnapshot(month, { ...figures, month, date, baseCurrency });
+  }, [loading, prefsLoading, accountsConfirmed, loadIssue, snapshots, missingRates, accounts, assets, lends, debts, baseCurrency, saveSnapshot]);
 
   // ── Daily nudge ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -437,6 +454,7 @@ function AppContent() {
             {activeTab === 'reports' && (
               <Reports transactions={personalTransactions} allTransactions={transactions} budgets={budgets}
                 accounts={accounts} debts={debts} assets={assets} lends={lends} missingRates={missingRates}
+                snapshots={snapshots || []}
                 userName={currentUser.displayName || currentUser.email} />
             )}
             {activeTab === 'settings' && (

@@ -142,9 +142,29 @@ function debtsFor(period, end, txs, debts) {
   };
 }
 
+// Today's position. Money held for others is left out, as on the Dashboard.
+export function netPosition({ accounts, assets, lends, debts }) {
+  const cash        = accounts.filter(a => !a.heldForOthers).reduce((s, a) => s + (a.baseBalance || 0), 0);
+  const investments = assets.filter(a => a.status === 'active' && !a.heldForOthers).reduce((s, a) => s + (a.baseValue || 0), 0);
+  const lent        = lends.reduce((s, l) => s + (l.baseOwed || 0), 0);
+  const owed        = debts.filter(d => d.status !== 'paid').reduce((s, d) => s + (d.baseBalance || 0), 0);
+  return { cash, investments, lent, debts: owed, netWorth: cash + investments + lent - owed };
+}
+
+// Saved month-end positions up to the period's end, plus the movement across the period if both
+// ends were saved. Figures saved in another base currency can't be compared, so they're skipped.
+function historyFor(period, end, snapshots, baseCurrency) {
+  const usable = snapshots.filter(s => s.baseCurrency === baseCurrency && s.date <= end)
+    .sort((a, b) => a.month.localeCompare(b.month));
+  const before = addDays(period.start, -1).slice(0, 7);
+  const opening = period.start.endsWith('-01') ? usable.find(s => s.month === before) : null;
+  const closing = usable.find(s => s.month === end.slice(0, 7));
+  return { points: usable.slice(-12), opening, closing };
+}
+
 // ── The report ───────────────────────────────────────────────────────────
 
-export function buildReport({ period, transactions, budgets, accounts, debts, assets, lends, fmt, fmtCur, today }) {
+export function buildReport({ period, transactions, budgets, accounts, debts, assets, lends, snapshots = [], baseCurrency, fmt, fmtCur, today }) {
   const partial = period.end > today;
   const end     = minDate(period.end, today);
   const compare = comparisonFor(period, end, partial);
@@ -184,15 +204,12 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
   const budget = budgetsFor(period, budgets, transactions, end);
   const debt   = debtsFor(period, end, txs, debts);
 
-  // ── Where things stand today (balance history isn't stored) ────────────
-  const cash        = accounts.filter(a => !a.heldForOthers).reduce((s, a) => s + (a.baseBalance || 0), 0);
-  const investments = assets.filter(a => a.status === 'active' && !a.heldForOthers).reduce((s, a) => s + (a.baseValue || 0), 0);
-  const lent        = lends.reduce((s, l) => s + (l.baseOwed || 0), 0);
-  const position = { cash, investments, lent, debts: debt.owedToday, netWorth: cash + investments + lent - debt.owedToday };
+  const position = netPosition({ accounts, assets, lends, debts });
+  const history  = historyFor(period, end, snapshots, baseCurrency);
 
   // ── Commentary ─────────────────────────────────────────────────────────
   const soFar = partial ? ' so far' : '';
-  const comments = { summary: [], income: [], spending: [], budgets: [], debts: [] };
+  const comments = { summary: [], income: [], spending: [], budgets: [], debts: [], position: [] };
 
   if (income > 0 && spending > income) {
     comments.summary.push(`You spent ${fmt(spending - income)} more than you received${soFar}, so the gap came from existing balances or borrowing.`);
@@ -283,6 +300,13 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
     comments.debts.push('You have no debts outstanding today.');
   }
 
+  if (history.opening && history.closing) {
+    const { netWorth: from } = history.opening;
+    const { netWorth: to }   = history.closing;
+    const moved = to - from;
+    comments.position.push(`Your net worth went from ${fmt(from)} to ${fmt(to)}${soFar} over this period, ${moved >= 0 ? 'up' : 'down'} ${fmt(Math.abs(moved))}.`);
+  }
+
   // ── Key events ─────────────────────────────────────────────────────────
   const highlights = [];
   debt.cleared.forEach(d => highlights.push(`${d.name} was paid off`));
@@ -316,7 +340,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
     totals: { income, spending, saved, left, debtRepaid, savingsRate, count: cur.count },
     changes: { income: change(income, prev.incomeTotal), spending: change(spending, prev.spending), saved: change(saved, prev.saved) },
     trend: trendFor(txs, period.start, end),
-    categories, incomeSources, largest, budget, debt, position,
+    categories, incomeSources, largest, budget, debt, position, history,
     comments, highlights: highlights.slice(0, 5), nextSteps: nextSteps.slice(0, 3),
   };
 }

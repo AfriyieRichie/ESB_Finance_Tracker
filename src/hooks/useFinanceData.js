@@ -168,6 +168,8 @@ export function useFinanceData(userId) {
   const [assets,       setAssets]       = useState(demo?.assets || []);
   const [projects,     setProjects]     = useState(demo?.projects || []);
   const [lends,        setLends]        = useState(demo?.lends || []);
+  // Month-by-month net worth; null until loaded
+  const [snapshots,    setSnapshots]    = useState(demo?.snapshots || null);
   const [loading,      setLoading]      = useState(!demo);
   // True once the server (not just the offline cache) has confirmed the accounts list
   const [accountsConfirmed, setAccountsConfirmed] = useState(!!demo);
@@ -218,7 +220,12 @@ export function useFinanceData(userId) {
     const unsubLends = listen('lends', 'lends', {},
       snap => setLends(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); unsubProjects(); unsubLends(); };
+    // History is a nice-to-have: it doesn't hold up loading or raise the load-issue banner
+    const unsubSnapshots = onSnapshot(collection(db, 'users', userId, 'snapshots'),
+      snap => setSnapshots(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.warn('Loading snapshots failed:', err));
+
+    return () => { clearTimeout(slowTimer); unsubTx(); unsubBudgets(); unsubAccounts(); unsubDebts(); unsubAssets(); unsubProjects(); unsubLends(); unsubSnapshots(); };
   }, [userId]);
 
   // ── Transactions ────────────────────────────────────────────────────────
@@ -330,6 +337,12 @@ export function useFinanceData(userId) {
   }, [userId]);
 
   // ── Deleted transactions trail ──────────────────────────────────────────
+
+  // One document per month, overwritten until the month ends, so each keeps its closing position
+  const saveSnapshot = useCallback((month, data) => {
+    setDoc(doc(db, 'users', userId, 'snapshots', month), data)
+      .catch(err => console.warn('Saving snapshot failed:', err));
+  }, [userId]);
 
   const listDeletedTransactions = useCallback(async () => {
     const snap = await getDocs(collection(db, 'users', userId, 'deletedTransactions'));
@@ -701,6 +714,7 @@ export function useFinanceData(userId) {
     addProject, updateProject, deleteProject,
     lends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
+    snapshots, saveSnapshot,
     getSpending,
   };
 }

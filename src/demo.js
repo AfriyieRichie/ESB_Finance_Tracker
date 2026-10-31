@@ -73,5 +73,10 @@ export function demoData() {
   const projects = [
     { id: 'p1', name: 'Online store', currency: 'GHS', startDate: day(25), budget: 25000, color: '#3b82f6', status: 'active', notes: 'Handmade accessories' },
   ];
-  return { accounts, transactions, budgets, debts, assets, projects };
+  const snapshots = [5, 4, 3, 2, 1].map((back, i) => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - back);
+    const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return { id: m, month: m, date: `${m}-28`, baseCurrency: 'GBP', netWorth: 900 + i * 320 };
+  });
+  return { accounts, transactions, budgets, debts, assets, projects, snapshots };
 }
