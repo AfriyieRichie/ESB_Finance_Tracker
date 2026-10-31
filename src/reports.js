@@ -4,6 +4,12 @@
 
 const MIN_TX = 5;   // below this, a period is too thin for comparisons and advice
 
+// Advice stays away from categories that aren't really choices, and never suggests cutting giving.
+// Default category names; categories a user adds simply aren't picked up by the flexible rule.
+const FLEXIBLE    = ['Entertainment', 'Shopping', 'Personal Care'];
+const NOT_TRIMMED = ['Debt Repayment', 'Tithe & Giving', 'Healthcare', 'Education'];
+const FIXED_BILLS = ['Housing', 'Utilities', ...NOT_TRIMMED];
+
 const pad = n => String(n).padStart(2, '0');
 export const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parse     = (s) => new Date(`${s}T00:00:00`);
@@ -77,7 +83,7 @@ function summarise(txs) {
   const expenses = txs.filter(t => t.type === 'expense');
   const savings  = txs.filter(t => t.type === 'savings');
   return {
-    count: txs.length, income, expenses,
+    count: txs.length, income, expenses, savings,
     incomeTotal: total(income), spending: total(expenses), saved: total(savings),
     debtRepaid: total(expenses.filter(t => t.debtId)),
   };
@@ -139,6 +145,51 @@ function debtsFor(period, end, txs, debts) {
     repayments: Object.values(repaid).sort((a, b) => b.value - a.value),
     borrowed, cleared, open,
     owedToday: open.reduce((s, d) => s + (d.baseBalance || 0), 0),
+  };
+}
+
+// Same payee, similar amount, in at least 3 of the last 6 months, about once a month
+function regularPayments(transactions, cur, end) {
+  const since = addDays(end, -183);
+  const seen = {};
+  transactions.filter(t => t.type === 'expense' && !t.debtId && !FIXED_BILLS.includes(t.category)
+    && t.date >= since && t.date <= end && t.description).forEach(t => {
+    (seen[t.description.trim().toLowerCase()] ||= []).push(t);
+  });
+  const inPeriod = new Set(cur.expenses.map(t => t.description?.trim().toLowerCase()));
+  return Object.entries(seen).filter(([key]) => inPeriod.has(key)).flatMap(([, list]) => {
+    const months  = new Set(list.map(t => t.date.slice(0, 7))).size;
+    const amounts = list.map(t => t.baseAmount || 0);
+    const similar = Math.max(...amounts) <= Math.min(...amounts) * 1.25;
+    if (months < 3 || list.length > months + 1 || !similar) return [];
+    return [{ name: list[0].description, yearly: (total(list) / list.length) * 12 }];
+  }).sort((a, b) => b.yearly - a.yearly);
+}
+
+// Monthly average per category across the 3 months before `start`, if at least 2 have records
+function threeMonthAverages(transactions, start) {
+  const [y, m] = start.split('-').map(Number);
+  const months = [1, 2, 3].map(back => isoDate(new Date(y, m - 1 - back, 1)).slice(0, 7));
+  const past = transactions.filter(t => t.type === 'expense' && months.includes(t.date.slice(0, 7)));
+  if (new Set(past.map(t => t.date.slice(0, 7))).size < 2) return null;
+  return Object.fromEntries(rollUp(past).map(c => [c.name, c.value / 3]));
+}
+
+function savingsFor(period, end, today, cur, assets) {
+  const held = assets.filter(a => a.status === 'active' && !a.heldForOthers).map(a => {
+    const rate = a.currentValue > 0 ? (a.baseValue || 0) / a.currentValue : 0;
+    const cost = (a.costBasis || 0) * rate;
+    return { id: a.id, name: a.name, value: a.baseValue || 0, cost, gain: (a.baseValue || 0) - cost };
+  }).sort((a, b) => b.value - a.value);
+  const soon = addDays(today, 60);
+  return {
+    byCategory: rollUp(cur.savings),
+    held,
+    value: held.reduce((s, a) => s + a.value, 0),
+    cost:  held.reduce((s, a) => s + a.cost, 0),
+    cashedOut: assets.filter(a => a.cashedOutDate >= period.start && a.cashedOutDate <= end),
+    maturing: assets.filter(a => a.status === 'active' && /^\d{4}-\d{2}-\d{2}$/.test(a.maturityDate || '')
+      && a.maturityDate >= today && a.maturityDate <= soon),
   };
 }
 
@@ -206,10 +257,11 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
 
   const position = netPosition({ accounts, assets, lends, debts });
   const history  = historyFor(period, end, snapshots, baseCurrency);
+  const savings  = savingsFor(period, end, today, cur, assets);
 
   // ── Commentary ─────────────────────────────────────────────────────────
   const soFar = partial ? ' so far' : '';
-  const comments = { summary: [], income: [], spending: [], budgets: [], debts: [], position: [] };
+  const comments = { summary: [], income: [], spending: [], advice: [], savings: [], budgets: [], debts: [], position: [] };
 
   if (income > 0 && spending > income) {
     comments.summary.push(`You spent ${fmt(spending - income)} more than you received${soFar}, so the gap came from existing balances or borrowing.`);
@@ -233,6 +285,8 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
       comments.income.push(`All of it came from ${top.name}, so this period relied on a single source.`);
     }
     const biggest = [...cur.income].sort((a, b) => b.baseAmount - a.baseAmount)[0];
+    const cashOuts = total(cur.income.filter(t => t.assetId));
+    if (cashOuts > 0) comments.income.push(`This includes ${fmt(cashOuts)} from cashing out investments, much of which is your own money coming back rather than new income.`);
     if (cur.income.length > 1) comments.income.push(`The largest payment was ${quoted(biggest)} at ${fmt(biggest.baseAmount)} on ${fmtDay(biggest.date)}.`);
   } else if (cur.count > 0) {
     comments.income.push('No income was recorded in this period.');
@@ -267,6 +321,88 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
       const big = largest[0];
       const share = Math.round((big.baseAmount / spending) * 100);
       comments.spending.push(`Your largest single expense was ${quoted(big)} at ${fmt(big.baseAmount)} on ${fmtDay(big.date)}${share >= 15 ? `, ${share}% of all spending` : ''}.`);
+    }
+  }
+
+  // ── Spending advice ────────────────────────────────────────────────────
+  if (!thin && spending > 0) {
+    const notable  = Math.max(spending * 0.03, 1);
+    const yearly   = 365 / days;
+    const averages = period.kind === 'month' && !partial ? threeMonthAverages(transactions, period.start) : null;
+    if (averages) {
+      categories.filter(c => !NOT_TRIMMED.includes(c.name) && !c.items.every(t => t.debtId)
+        && averages[c.name] > 0 && c.value >= averages[c.name] * 1.25 && c.value - averages[c.name] >= notable)
+        .sort((a, b) => (b.value - averages[b.name]) - (a.value - averages[a.name])).slice(0, 2)
+        .forEach(c => {
+          const avg = averages[c.name];
+          comments.advice.push(`${c.name} was ${Math.round((c.value / avg - 1) * 100)}% above your 3-month average of ${fmt(avg)}. Getting back to that average would free up ${fmt(c.value - avg)} a month.`);
+        });
+    }
+
+    const regular = regularPayments(transactions, cur, end).slice(0, 3);
+    if (regular.length) {
+      comments.advice.push(`${regular.length === 1 ? 'This looks like a regular payment' : 'These look like regular payments'}: ${listOf(regular.map(r => `${r.name} (about ${fmt(r.yearly)} a year)`))}. Check you still get value from ${regular.length === 1 ? 'it' : 'each one'}.`);
+    }
+
+    const flexible = categories.filter(c => FLEXIBLE.includes(c.name));
+    const flexTotal = flexible.reduce((s, c) => s + c.value, 0);
+    if (flexTotal > 0 && (income <= 0 || flexTotal / income >= 0.1)) {
+      comments.advice.push(`${listOf(flexible.map(c => c.name))} came to ${fmt(flexTotal)}${income > 0 ? `, ${Math.round((flexTotal / income) * 100)}% of your income` : ''}. This is usually the easiest spending to adjust: cutting it by a tenth would free up about ${fmt(flexTotal * 0.1 * yearly)} a year.`);
+    }
+
+    const housing = categories.find(c => c.name === 'Housing');
+    if (housing && income > 0 && housing.value / income > 0.35) {
+      comments.advice.push(`Housing took ${Math.round((housing.value / income) * 100)}% of your income. A common guide is around 30%, so it's worth reviewing when your rent or mortgage next comes up for renewal.`);
+    }
+
+    const frequent = dayToDay.filter(c => !NOT_TRIMMED.includes(c.name) && c.name !== 'Housing' && c.name !== 'Utilities'
+      && (c.items.length / days) * 30 >= 8 && c.value / c.items.length <= spending * 0.05)[0];
+    if (frequent) {
+      const each = frequent.value / frequent.items.length;
+      comments.advice.push(`You made ${frequent.items.length} ${frequent.name} purchases averaging ${fmt(each)}. Small amounts add up: one fewer a week would save about ${fmt(each * 52)} a year.`);
+    }
+
+    if (income > 0 && saved < income * 0.2) {
+      const needed = income * 0.2 - saved;
+      const target = income * 0.8 - debtRepaid;
+      if (left >= needed) {
+        comments.advice.push(`You had ${fmt(left)} left over. Moving ${fmt(needed)} of it into savings would take you to 20% of your income.`);
+      } else if (target > 0 && spending - debtRepaid > target) {
+        comments.advice.push(`Saving 20% of your income would mean keeping other spending under ${fmt(target)}, which is ${fmt(spending - debtRepaid - target)} less than this period.`);
+      }
+    }
+    comments.advice = comments.advice.slice(0, 5);
+  }
+
+  // ── Savings and investments ────────────────────────────────────────────
+  if (saved > 0) {
+    const top = savings.byCategory[0];
+    comments.savings.push(`You added ${fmt(saved)}, ${income > 0 ? `${Math.round(savingsRate * 100)}% of your income` : 'with no income recorded'}${against(saved, prev.saved)}.${savings.byCategory.length > 1 ? ` The most went to ${top.name}, at ${fmt(top.value)}.` : ''}`);
+  } else if (cur.count > 0) {
+    comments.savings.push('Nothing was added to savings or investments in this period.');
+  }
+  if (savings.held.length) {
+    const gain = savings.value - savings.cost;
+    const pct  = savings.cost > 0 ? ` (${Math.round((Math.abs(gain) / savings.cost) * 100)}%)` : '';
+    comments.savings.push(`Your investments are worth ${fmt(savings.value)} today, ${fmt(Math.abs(gain))}${pct} ${gain >= 0 ? 'more' : 'less'} than you put in.`);
+    if (savings.held.length > 1) {
+      const best = [...savings.held].sort((a, b) => b.gain - a.gain)[0];
+      if (best.gain > 0) comments.savings.push(`${best.name} has gained the most, at ${fmt(best.gain)}.`);
+    }
+  }
+  savings.cashedOut.forEach(a => {
+    const gain = (a.cashedOutAmount || 0) - (a.costBasis || 0);
+    comments.savings.push(`You cashed out ${a.name} on ${fmtDay(a.cashedOutDate)} for ${fmtCur(a.cashedOutAmount || 0, a.currency)}, ${fmtCur(Math.abs(gain), a.currency)} ${gain >= 0 ? 'more' : 'less'} than you put in.`);
+  });
+  savings.maturing.forEach(a => comments.savings.push(`${a.name} matures on ${fmtDay(a.maturityDate)}, so it's time to decide whether to reinvest it.`));
+
+  const monthlySpend = ((spending - debtRepaid) / days) * 30.4;
+  if (!thin && days >= 28 && monthlySpend > 0) {
+    const months = position.cash / monthlySpend;
+    if (months < 3) {
+      comments.savings.push(`Your cash would cover about ${months < 0 ? 0 : months.toFixed(1)} months of spending at this rate. A common target is 3 to 6 months, so building that cushion is worth doing first.`);
+    } else {
+      comments.savings.push(`Your cash would cover about ${months.toFixed(1)} months of spending at this rate${months > 6 ? ', above the common 3 to 6 month target, so some of it could be working harder in savings or investments' : ', within the common 3 to 6 month target'}.`);
     }
   }
 
@@ -312,6 +448,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
   debt.cleared.forEach(d => highlights.push(`${d.name} was paid off`));
   if (largest[0] && cur.expenses.length > 1) highlights.push(`Largest expense: ${quoted(largest[0])}, ${fmt(largest[0].baseAmount)}`);
   if (debt.borrowed.length) highlights.push(`New borrowing of ${fmt(newBorrowing)}`);
+  savings.cashedOut.forEach(a => highlights.push(`${a.name} was cashed out`));
   if (over.length) highlights.push(`Biggest budget overrun: ${over[0].category}, ${fmt(over[0].actual - over[0].budget)}`);
 
   // ── Next steps ─────────────────────────────────────────────────────────
@@ -326,9 +463,6 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
     if (!budget.rows.length && budget.months.length && dayToDay[0]) {
       nextSteps.push(`You have no budgets for this period. ${dayToDay[0].name} is a good place to start, at ${fmt(dayToDay[0].value)}.`);
     }
-    if (income > 0 && (savingsRate ?? 0) < 0.1) {
-      nextSteps.push(`You saved ${Math.round((savingsRate ?? 0) * 100)}% of your income. Reaching 10% would mean saving ${fmt(income * 0.1)} over a period like this.`);
-    }
     const costly = debt.open.filter(d => Number(d.interestRate) > 0).sort((a, b) => b.interestRate - a.interestRate)[0];
     if (costly && debt.open.length > 1) {
       nextSteps.push(`${costly.name} has your highest interest rate at ${costly.interestRate}%, so extra repayments there save the most.`);
@@ -340,7 +474,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
     totals: { income, spending, saved, left, debtRepaid, savingsRate, count: cur.count },
     changes: { income: change(income, prev.incomeTotal), spending: change(spending, prev.spending), saved: change(saved, prev.saved) },
     trend: trendFor(txs, period.start, end),
-    categories, incomeSources, largest, budget, debt, position, history,
+    categories, incomeSources, largest, budget, debt, position, history, savings,
     comments, highlights: highlights.slice(0, 5), nextSteps: nextSteps.slice(0, 3),
   };
 }

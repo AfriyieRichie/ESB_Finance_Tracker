@@ -143,7 +143,7 @@ export default function Reports({ transactions, allTransactions, budgets, accoun
   }
   if (report.empty) return shell(<div className="chart-card report-empty"><p>No transactions recorded for {period.label}.</p></div>);
 
-  const { totals, changes, comments, position, debt, budget, history } = report;
+  const { totals, changes, comments, position, debt, budget, history, savings } = report;
   const netWorthTrend = history.points.map(s => ({
     label: new Date(`${s.month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }),
     netWorth: s.netWorth,
@@ -247,6 +247,33 @@ export default function Reports({ transactions, allTransactions, budgets, accoun
               ))}
             </tbody>
           </table>
+          {comments.advice.length > 0 && <><h3>Advice on your spending</h3><Comments items={comments.advice} /></>}
+        </section>
+      )}
+
+      {comments.savings.length > 0 && (
+        <section className="chart-card report-section">
+          <h2>Savings and investments</h2>
+          <Comments items={comments.savings} />
+          {savings.byCategory.length > 1 && (
+            <Bars rows={savings.byCategory.map(s => ({ name: s.name, value: s.value, note: `${fmt(s.value)} · ${Math.round((s.value / totals.saved) * 100)}%` }))} />
+          )}
+          {savings.held.length > 0 && (
+            <>
+              <h3>Your investments today</h3>
+              <table className="report-table">
+                <thead><tr><th>Investment</th><th className="num">Put in</th><th className="num">Worth</th><th className="num">Gain or loss</th></tr></thead>
+                <tbody>
+                  {savings.held.map(a => (
+                    <tr key={a.id}>
+                      <td>{a.name}</td><td className="num">{fmt(a.cost)}</td><td className="num">{fmt(a.value)}</td>
+                      <td className="num">{a.gain < 0 ? '-' : '+'}{fmt(Math.abs(a.gain))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </section>
       )}
 
