@@ -6,6 +6,7 @@ import Auth from './components/Auth';
 import Dashboard from './components/Dashboard';
 import Budget from './components/Budget';
 import Transactions from './components/Transactions';
+import Reports from './components/Reports';
 import Accounts from './components/Accounts';
 import Settings from './components/Settings';
 import OnboardingWizard from './components/OnboardingWizard';
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'budget',       label: 'Budget',       icon: '◎' },
   { id: 'transactions', label: 'Transactions', icon: '≡' },
   { id: 'accounts',     label: 'Accounts',     icon: '⬡' },
+  { id: 'reports',      label: 'Reports',      icon: '▤' },
 ];
 
 const TODAY          = new Date().toISOString().slice(0, 10);
@@ -431,6 +433,11 @@ function AppContent() {
                 addAsset={addAsset} updateAsset={updateAsset} updateAssetValue={updateAssetValue}
                 cashOutAsset={cashOutAsset} deleteAsset={deleteAsset} addTransfer={addTransfer}
               />
+            )}
+            {activeTab === 'reports' && (
+              <Reports transactions={personalTransactions} allTransactions={transactions} budgets={budgets}
+                accounts={accounts} debts={debts} assets={assets} lends={lends} missingRates={missingRates}
+                userName={currentUser.displayName || currentUser.email} />
             )}
             {activeTab === 'settings' && (
               <Settings
