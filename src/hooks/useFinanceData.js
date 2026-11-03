@@ -368,11 +368,25 @@ export function useFinanceData(userId) {
 
   // ── Budgets ─────────────────────────────────────────────────────────────
 
-  const upsertBudget = useCallback(async (budget) => {
-    const safe  = s => s.replace(/[^\w]/g, '_');
-    const docId = `${budget.type || 'expense'}_${safe(budget.category)}_${budget.month}`;
-    await whenSaved(setDoc(doc(db, 'users', userId, 'budgets', docId), { type: 'expense', ...budget }, { merge: true }));
+  // One budget per type, category and month: the id is built from those, so saving again updates it
+  const budgetRef = useCallback((b) => {
+    const safe = s => s.replace(/[^\w]/g, '_');
+    return doc(db, 'users', userId, 'budgets', `${b.type || 'expense'}_${safe(b.category)}_${b.month}`);
   }, [userId]);
+
+  const upsertBudget = useCallback(async (budget) => {
+    await whenSaved(setDoc(budgetRef(budget), { type: 'expense', ...budget }, { merge: true }));
+  }, [budgetRef]);
+
+  // Copy budgets into another month in one save (the caller passes only ones not set there yet)
+  const copyBudgets = useCallback(async (list, month) => {
+    const batch = writeBatch(db);
+    list.forEach(b => {
+      const copy = { type: b.type || 'expense', category: b.category, amount: b.amount, month };
+      batch.set(budgetRef(copy), copy);
+    });
+    await whenSaved(batch.commit());
+  }, [budgetRef]);
 
   const deleteBudget = useCallback(async (id) => {
     await whenSaved(deleteDoc(doc(db, 'users', userId, 'budgets', id)));
@@ -714,7 +728,7 @@ export function useFinanceData(userId) {
     addProject, updateProject, deleteProject,
     lends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
-    snapshots, saveSnapshot,
+    snapshots, saveSnapshot, copyBudgets,
     getSpending,
   };
 }

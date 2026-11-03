@@ -89,7 +89,7 @@ function BudgetModal({ month, existing, defaultType = 'expense', onSave, onClose
   );
 }
 
-export default function Budget({ budgets, transactions, upsertBudget, deleteBudget }) {
+export default function Budget({ budgets, transactions, upsertBudget, deleteBudget, copyBudgets }) {
   const fmt = useFmt();
   const [confirm, confirmDialog] = useConfirm();
   const now = new Date();
@@ -147,6 +147,21 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
   ];
   const canAdd = allPossible.some(key => !alreadySet.has(key));
 
+  // Copy from the most recent earlier month that has budgets (so a skipped month doesn't matter),
+  // adding only the ones this month doesn't have yet
+  const source = useMemo(() => budgets.reduce((latest, b) => (b.month < monthStr && b.month > latest ? b.month : latest), ''), [budgets, monthStr]);
+  const sourceName = source ? new Date(`${source}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '';
+  const toCopy = source ? budgets.filter(b => b.month === source && !alreadySet.has(`${b.type || 'expense'}:${b.category}`)) : [];
+  const [copying, setCopying] = useState(false);
+  const copyFromSource = async () => {
+    setCopying(true);
+    try { await copyBudgets(toCopy, monthStr); } finally { setCopying(false); }
+  };
+  const copySummary = GROUPS.map(g => {
+    const list = toCopy.filter(b => (b.type || 'expense') === g.type);
+    return list.length ? `${g.title.toLowerCase()} ${fmt(list.reduce((s, b) => s + b.amount, 0))}` : null;
+  }).filter(Boolean).join(' · ');
+
 
   return (
     <div className="budget-page">
@@ -167,11 +182,33 @@ export default function Budget({ budgets, transactions, upsertBudget, deleteBudg
         <div className="empty-state">
           <div className="empty-icon"><Wallet size={48} strokeWidth={1.2} className="ico-muted" /></div>
           <h3>No budgets set</h3>
-          <p>Set monthly budgets to track your spending against goals.</p>
-          <button className="btn-pill" onClick={openAdd}>Add Your First Budget</button>
+          {toCopy.length > 0 ? (
+            <>
+              <p>Copy your {toCopy.length} {toCopy.length === 1 ? 'budget' : 'budgets'} from {sourceName} ({copySummary}), then adjust any that need changing.</p>
+              <div className="budget-copy-actions">
+                <button className="btn-pill" onClick={copyFromSource} disabled={copying}>
+                  {copying ? 'Copying…' : `Copy from ${sourceName.split(' ')[0]}`}
+                </button>
+                <button className="btn-secondary" onClick={openAdd}>Start fresh</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>Set monthly budgets to track your spending against goals.</p>
+              <button className="btn-pill" onClick={openAdd}>Add Your First Budget</button>
+            </>
+          )}
         </div>
       ) : (
         <>
+          {toCopy.length > 0 && (
+            <p className="budget-copy-note">
+              {toCopy.length} {toCopy.length === 1 ? 'budget' : 'budgets'} from {sourceName} {toCopy.length === 1 ? "isn't" : "aren't"} set for this month yet.{' '}
+              <button type="button" className="auth-switch-link" onClick={copyFromSource} disabled={copying}>
+                {copying ? 'Copying…' : `Copy ${toCopy.length === 1 ? 'it' : 'them'}`}
+              </button>
+            </p>
+          )}
           {/* ── Per-type totals: click one to show its budgets ── */}
           <div className="group-grid">
             {GROUPS.map(g => {

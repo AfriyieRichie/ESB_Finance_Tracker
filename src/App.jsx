@@ -130,7 +130,7 @@ function AppContent() {
     projects, addProject, updateProject, deleteProject,
     lends: rawLends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
-    snapshots, saveSnapshot,
+    snapshots, saveSnapshot, copyBudgets,
   } = useFinanceData(currentUser?.uid);
 
   // ── Multi-currency: tag everything with its currency and its value in the base currency ──
@@ -428,7 +428,7 @@ function AppContent() {
             )}
             {activeTab === 'budget' && (
               <Budget budgets={budgets} transactions={personalTransactions}
-                upsertBudget={upsertBudget} deleteBudget={deleteBudget} />
+                upsertBudget={upsertBudget} deleteBudget={deleteBudget} copyBudgets={copyBudgets} />
             )}
             {activeTab === 'transactions' && (
               <Transactions

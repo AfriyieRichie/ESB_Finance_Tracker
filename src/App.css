@@ -2708,3 +2708,8 @@ select optgroup {
   .report-donut { grid-template-columns: 200px minmax(0, 1fr); }
   .report-hide-sm { display: table-cell; }
 }
+
+/* ─── Budget: copy from an earlier month ─────────────── */
+.budget-copy-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.budget-copy-note { font-size: 13px; color: var(--text-2); margin: -12px 0 16px; }
+.budget-copy-note .auth-switch-link { font-size: 13px; }
