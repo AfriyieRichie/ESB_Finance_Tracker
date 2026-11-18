@@ -410,6 +410,16 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (existing) {
+      if (!name.trim()) return;
+      setBusy(true);
+      await onSave({
+        name: name.trim(), assetType, maturityDate: maturity || null,
+        ...(assetUsesUnits(assetType) || existing.units ? { units: parseFloat(units) || 0 } : {}),
+      });
+      onClose();
+      return;
+    }
     if (!name.trim() || !costBasis) return;
     if (crossCur && sourceCost === null) return;
     setBusy(true);
@@ -442,7 +452,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
           <div className="form-group">
             <label>Asset Name</label>
             <input type="text" placeholder="e.g. Government bonds" value={name}
-              onChange={e => setName(e.target.value)} autoFocus required />
+              onChange={e => setName(e.target.value)} autoFocus={!existing} required />
           </div>
           <div className="form-group">
             <label>Asset Type</label>
@@ -450,6 +460,13 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
               {assetTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
           </div>
+          {existing ? (
+            <p className="fx-hint">
+              {fmtCur(existing.costBasis || 0, currency)} invested, worth {fmtCur(existing.currentValue || 0, currency)}.
+              Use Update Value, Withdraw or a Save / Invest transaction to change these amounts.
+            </p>
+          ) : (
+          <>
           <div className="form-group">
             <label>Currency</label>
             <CurrencySelect value={currency} onChange={setCurrency} />
@@ -466,10 +483,12 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
                 value={currValue} onChange={e => setCurrValue(e.target.value)} />
             </div>
           </div>
-          {assetUsesUnits(assetType) && (
+          </>
+          )}
+          {(assetUsesUnits(assetType) || existing?.units > 0) && (
             <div className="form-group">
-              <label>Number of shares / units (optional)</label>
-              <input type="number" min="0" step="any" placeholder="e.g. 25" value={units} onChange={e => setUnits(e.target.value)} />
+              <label>{existing ? 'Shares / units you hold now' : 'Number of shares / units (optional)'}</label>
+              <input type="number" min="0" step="any" placeholder="e.g. 25" value={units} onChange={e => setUnits(e.target.value)} autoFocus={!!existing} />
               {parseFloat(units) > 0 && parseFloat(costBasis) > 0 && (
                 <p className="fx-hint">{fmtCur(parseFloat(costBasis) / parseFloat(units), currency)} per share</p>
               )}
@@ -902,7 +921,7 @@ function DebtCard({ debt, onEdit, onDelete, onSettle }) {
 
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
-function AssetCard({ asset, transactions, onUpdateValue, onWithdraw, onDelete, onToggleHeld }) {
+function AssetCard({ asset, transactions, onEdit, onUpdateValue, onWithdraw, onDelete, onToggleHeld }) {
   const { fmtCur, assetTypes } = usePreferences();
   const [showHistory, setShowHistory] = useState(false);
   const fmt = (v) => fmtCur(v, asset.currency);
@@ -928,7 +947,10 @@ function AssetCard({ asset, transactions, onUpdateValue, onWithdraw, onDelete, o
             {asset.heldForOthers && <span className="held-badge">Held for others · not in net worth</span>}
           </div>
         </div>
-        <button className="icon-btn delete-btn" onClick={() => onDelete(asset.id)} title="Delete"><Trash2 size={13} strokeWidth={1.6} /></button>
+        <div className="acct-actions">
+          <button className="icon-btn" onClick={() => onEdit(asset)} title="Edit"><Pencil size={13} strokeWidth={1.6} /></button>
+          <button className="icon-btn delete-btn" onClick={() => onDelete(asset.id)} title="Delete"><Trash2 size={13} strokeWidth={1.6} /></button>
+        </div>
       </div>
 
       <label className="held-check small">
@@ -937,10 +959,15 @@ function AssetCard({ asset, transactions, onUpdateValue, onWithdraw, onDelete, o
       </label>
 
       <div className="asset-values">
-        {units > 0 && (
+        {units > 0 ? (
           <div className="asset-val-row">
             <span className="asset-val-label">Shares</span>
             <span className="asset-val">{fmtUnits(units)} · avg {fmt(asset.costBasis / units)}</span>
+          </div>
+        ) : assetUsesUnits(asset.assetType) && (
+          <div className="asset-val-row">
+            <span className="asset-val-label">Shares</span>
+            <button type="button" className="auth-switch-link" onClick={() => onEdit(asset)}>Add shares held</button>
           </div>
         )}
         <div className="asset-val-row">
@@ -1443,6 +1470,7 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
                     key={a.id}
                     asset={a}
                     transactions={transactions}
+                    onEdit={asset => setModal({ type: 'asset', data: asset })}
                     onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
                     onWithdraw={asset => setModal({ type: 'withdraw', data: asset })}
                     onDelete={confirmDeleteAsset}
@@ -1614,7 +1642,8 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
         />
       )}
       {modal?.type === 'asset' && (
-        <AssetModal existing={modal.data} accounts={accounts} onSave={addAsset} onClose={close} />
+        <AssetModal existing={modal.data} accounts={accounts} onClose={close}
+          onSave={modal.data ? (updates) => updateAsset(modal.data.id, updates) : addAsset} />
       )}
       {modal?.type === 'transfer' && (
         <TransferModal accounts={accounts} onTransfer={addTransfer} onClose={close} />
