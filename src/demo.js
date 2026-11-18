@@ -53,6 +53,13 @@ export function demoData() {
     tx('t18', 6, 'Instagram ads', 120, 'expense', 'Marketing & Ads', 'a1', { projectId: 'p1' }),
     tx('t19', 2, 'First client payment', 380, 'income', 'Sales', 'a1', { projectId: 'p1' }),
     tx('t20', 1, 'Packaging from Makola', 450, 'expense', 'Stock / Inventory', 'a3', { projectId: 'p1' }),
+    // shares: bought 8 + 4, sold 3 at a gain; an ETF bought and fully cashed out
+    tx('t23', 40, 'Index fund shares', 800, 'savings', 'Stock Portfolio', 'a1', { assetId: 's2', assetUnits: 8 }),
+    tx('t24', 25, 'Index fund shares', 400, 'savings', 'Stock Portfolio', 'a1', { assetId: 's2', assetUnits: 4 }),
+    tx('t25', 4, 'Withdrawal from Index fund', 300, 'assetout', 'Investment withdrawal', 'a1', { assetId: 's2', assetAmount: 420, assetCost: 300, assetUnits: 3, pairId: 't26' }),
+    tx('t26', 4, 'Gain on Index fund', 120, 'income', 'Investment Gain', 'a1', { assetId: 's2', assetGain: 120, pairId: 't25' }),
+    tx('t27', 60, 'Investment: Tech ETF', 500, 'savings', 'Stock Portfolio', 'a1', { assetId: 's3', assetUnits: 20 }),
+    tx('t28', 3, 'Cashed out Tech ETF', 500, 'assetout', 'Investment withdrawal', 'a1', { assetId: 's3', assetAmount: 460, assetCost: 500, assetUnits: 20, assetBefore: { currentValue: 460, costBasis: 500, units: 20 } }),
   ];
   const budgets = [
     { id: 'b1', type: 'expense', category: 'Food & Dining',  amount: 300,  month },
@@ -68,7 +75,8 @@ export function demoData() {
   ];
   const assets = [
     { id: 's1', name: 'Treasury bills', assetType: 'tbill', currency: 'GHS', costBasis: 5000, currentValue: 5400, status: 'active', maturityDate: day(-60) },
-    { id: 's2', name: 'Index fund', assetType: 'stocks', currency: 'GBP', costBasis: 1200, currentValue: 1310, status: 'active' },
+    { id: 's2', name: 'Index fund', assetType: 'stocks', currency: 'GBP', costBasis: 900, currentValue: 1310, units: 9, status: 'active' },
+    { id: 's3', name: 'Tech ETF', assetType: 'stocks', currency: 'GBP', costBasis: 0, currentValue: 0, units: 0, status: 'cashed_out', cashedOutDate: day(3) },
   ];
   const projects = [
     { id: 'p1', name: 'Online store', currency: 'GHS', startDate: day(25), budget: 25000, color: '#3b82f6', status: 'active', notes: 'Handmade accessories' },

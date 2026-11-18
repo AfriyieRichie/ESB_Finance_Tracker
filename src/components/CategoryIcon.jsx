@@ -23,6 +23,8 @@ const CATEGORY_ICONS = {
   // Income
   'Salary':         Briefcase,
   'Dividend':       TrendingUp,
+  'Investment Gain': TrendingUp,
+  'Investment withdrawal': Wallet,
   'Interest':       Landmark,
   'Business':       Building2,
   'Freelance':      Laptop,

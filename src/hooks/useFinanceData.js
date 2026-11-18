@@ -31,6 +31,7 @@ export const INCOME_CATEGORIES = [
   { name: 'Business',  icon: '🏢', color: '#06b6d4' },
   { name: 'Freelance', icon: '💻', color: '#34d399' },
   { name: 'Rental',    icon: '🏡', color: '#00b85a' },
+  { name: 'Investment Gain', icon: '📈', color: '#14b8a6' },
   { name: 'Others',    icon: '📦', color: '#7db896' },
 ];
 
@@ -85,6 +86,9 @@ export const ACCOUNT_TYPES = [
   { id: 'cash',   label: 'Cash',          color: '#22c55e' },
   { id: 'other',  label: 'Other',         color: '#6b7280' },
 ];
+
+// Investment types that are held as a number of shares or units (custom types may be too)
+export const assetUsesUnits = (type) => ['stocks', 'crypto', 'mutualfund'].includes(type) || !ASSET_TYPES.some(t => t.id === type);
 
 export const ASSET_TYPES = [
   { id: 'tbill',      label: 'Treasury Bill',        color: '#06b6d4' },
@@ -154,8 +158,11 @@ const ASSET_TYPE_TO_CATEGORY = {
 const debtAmt  = t => t.debtAmount  ?? t.amount;
 // Money coming into an account: income, or cash received from a new loan ('loan', not income)
 // 'lendrepay' = money a borrower paid back to you
-const isInflow = t => t.type === 'income' || t.type === 'loan' || t.type === 'lendrepay';
+// 'assetout' = money withdrawn from an investment (your own money coming back, not income)
+const isInflow = t => ['income', 'loan', 'lendrepay', 'assetout'].includes(t.type);
 const assetAmt = t => t.assetAmount ?? t.amount;
+const unitsOf  = t => Number(t.assetUnits) || 0;
+const unitsBy  = n => (n ? { units: increment(n) } : {});
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
@@ -251,6 +258,7 @@ export function useFinanceData(userId) {
       batch.update(doc(db, 'users', userId, 'assets', t.assetId), {
         costBasis:    increment(assetAmt(t)),
         currentValue: increment(assetAmt(t)),
+        ...unitsBy(unitsOf(t)),
       });
     }
 
@@ -258,57 +266,70 @@ export function useFinanceData(userId) {
   }, [userId]);
 
   const deleteTransaction = useCallback(async (id) => {
-    const tx = transactions.find(t => t.id === id);
-    if (!tx) return;
+    const first = transactions.find(t => t.id === id);
+    if (!first) return;
+    // A withdrawal and its gain are one event, so they're deleted together
+    const partner = first.pairId && transactions.find(t => t.id === first.pairId);
 
     const batch = writeBatch(db);
-    // Keep a copy in the deleted-transactions trail (Settings → Data) so it can be reviewed or restored
-    const { id: _omit, ...copy } = tx;
-    batch.set(doc(db, 'users', userId, 'deletedTransactions', id), { ...copy, deletedAt: Date.now() });
-    batch.delete(doc(db, 'users', userId, 'transactions', id));
+    for (const tx of partner ? [first, partner] : [first]) {
+      // Keep a copy in the deleted-transactions trail (Settings → Data) so it can be reviewed or restored
+      const { id: _omit, ...copy } = tx;
+      batch.set(doc(db, 'users', userId, 'deletedTransactions', tx.id), { ...copy, deletedAt: Date.now() });
+      batch.delete(doc(db, 'users', userId, 'transactions', tx.id));
 
-    if (tx.type === 'transfer') {
-      // Reverse both sides of the transfer
-      if (tx.fromAccountId) batch.update(doc(db, 'users', userId, 'accounts', tx.fromAccountId), { balance: increment(tx.amount) });
-      if (tx.toAccountId)   batch.update(doc(db, 'users', userId, 'accounts', tx.toAccountId),   { balance: increment(-(tx.toAmount ?? tx.amount)) });
-    } else {
-      // Reverse account balance for regular transactions
-      if (tx.accountId) {
-        const delta = isInflow(tx) ? -tx.amount : tx.amount;
-        batch.update(doc(db, 'users', userId, 'accounts', tx.accountId), { balance: increment(delta) });
-      }
-      // Reverse debt reduction
-      if (tx.debtId) {
-        batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(debtAmt(tx)) });
-      }
-      // Money lent / repayments received: keep the loan record in step
-      if (tx.lendId && tx.type === 'lend') {
-        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
-          principal: increment(-(tx.lendAmount ?? tx.amount)),
-          ...(tx.lendExpectedAdd ? { expected: increment(-tx.lendExpectedAdd) } : {}),
-        });
-      }
-      if (tx.lendId && tx.type === 'income' && tx.lendInterest) {
-        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
-          repaid: increment(-tx.lendInterest), status: 'active', closedDate: null,
-        });
-      }
-      if (tx.lendId && tx.type === 'lendrepay') {
-        batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
-          repaid: increment(-(tx.lendAmount ?? tx.amount)), status: 'active', closedDate: null,
-        });
-      }
-      // Reverse asset cost basis
-      if (tx.type === 'savings' && tx.assetId) {
-        batch.update(doc(db, 'users', userId, 'assets', tx.assetId), {
-          costBasis:    increment(-assetAmt(tx)),
-          currentValue: increment(-assetAmt(tx)),
-        });
+      if (tx.type === 'transfer') {
+        // Reverse both sides of the transfer
+        if (tx.fromAccountId) batch.update(doc(db, 'users', userId, 'accounts', tx.fromAccountId), { balance: increment(tx.amount) });
+        if (tx.toAccountId)   batch.update(doc(db, 'users', userId, 'accounts', tx.toAccountId),   { balance: increment(-(tx.toAmount ?? tx.amount)) });
+      } else {
+        // Reverse account balance for regular transactions
+        if (tx.accountId) {
+          const delta = isInflow(tx) ? -tx.amount : tx.amount;
+          batch.update(doc(db, 'users', userId, 'accounts', tx.accountId), { balance: increment(delta) });
+        }
+        // Reverse debt reduction
+        if (tx.debtId) {
+          batch.update(doc(db, 'users', userId, 'debts', tx.debtId), { currentBalance: increment(debtAmt(tx)) });
+        }
+        // Money lent / repayments received: keep the loan record in step
+        if (tx.lendId && tx.type === 'lend') {
+          batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+            principal: increment(-(tx.lendAmount ?? tx.amount)),
+            ...(tx.lendExpectedAdd ? { expected: increment(-tx.lendExpectedAdd) } : {}),
+          });
+        }
+        if (tx.lendId && tx.type === 'income' && tx.lendInterest) {
+          batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+            repaid: increment(-tx.lendInterest), status: 'active', closedDate: null,
+          });
+        }
+        if (tx.lendId && tx.type === 'lendrepay') {
+          batch.update(doc(db, 'users', userId, 'lends', tx.lendId), {
+            repaid: increment(-(tx.lendAmount ?? tx.amount)), status: 'active', closedDate: null,
+          });
+        }
+        // Reverse asset cost basis (skipped if the investment itself has been deleted)
+        const assetExists = tx.assetId && assets.some(a => a.id === tx.assetId);
+        if (tx.type === 'savings' && assetExists) {
+          batch.update(doc(db, 'users', userId, 'assets', tx.assetId), {
+            costBasis:    increment(-assetAmt(tx)),
+            currentValue: increment(-assetAmt(tx)),
+            ...unitsBy(-unitsOf(tx)),
+          });
+        }
+        // Withdrawal: put back what came out. A closing withdrawal restores the investment exactly as
+        // it was, so it reopens.
+        if (tx.type === 'assetout' && assetExists) {
+          batch.update(doc(db, 'users', userId, 'assets', tx.assetId), tx.assetBefore
+            ? { ...tx.assetBefore, status: 'active', cashedOutDate: deleteField() }
+            : { currentValue: increment(tx.assetAmount || 0), costBasis: increment(tx.assetCost || 0), ...unitsBy(unitsOf(tx)) });
+        }
       }
     }
 
     await whenSaved(batch.commit());
-  }, [userId, transactions]);
+  }, [userId, transactions, assets]);
 
   // amount is in the source account's currency; toAmount (if given) is what arrived in the
   // destination account's currency, so cross-currency transfers record the real rate incl. fees
@@ -478,6 +499,7 @@ export function useFinanceData(userId) {
         date:        new Date().toISOString().slice(0, 10),
         accountId:   sourceAccountId,
         assetId:     assetRef.id,
+        ...(asset.units ? { assetUnits: asset.units } : {}),
       });
       batch.update(doc(db, 'users', userId, 'accounts', sourceAccountId), {
         balance: increment(-paid),
@@ -495,38 +517,46 @@ export function useFinanceData(userId) {
     await whenSaved(updateDoc(doc(db, 'users', userId, 'assets', id), { currentValue: newValue }));
   }, [userId]);
 
-  // Cash out: marks asset done, creates income tx, credits target account
-  const cashOutAsset = useCallback(async (id, receivedAmount, toAccountId, txMeta = {}) => {
-    const asset = assets.find(a => a.id === id);
-    if (!asset) return;
-
+  // Withdraw from an investment. w = { value (asset currency), units, close, accountId, received
+  // (receiving account's currency), date, fx }. The same share of what you originally put in comes
+  // out with it (by shares when they're known, otherwise by value). That part is your own money
+  // coming back; only anything above it is a gain, recorded as income.
+  const withdrawFromAsset = useCallback(async (asset, w) => {
+    const round = v => Math.round(v * 100) / 100;
+    const held  = Number(asset.units) || 0;
+    const value = Number(asset.currentValue) || 0;
+    const share = w.close ? 1 : held > 0 && w.units > 0 ? w.units / held : value > 0 ? w.value / value : 0;
+    const close = w.close || share >= 0.9999;
+    const cost  = round((asset.costBasis || 0) * Math.min(share, 1));
+    const gain  = round(w.value - cost);
+    const ratio = w.value > 0 ? w.received / w.value : 1;
+    const units = close ? held : (w.units || 0);
     const batch = writeBatch(db);
-
-    batch.update(doc(db, 'users', userId, 'assets', id), {
-      status:         'cashed_out',
-      cashedOutAmount: receivedAmount,
-      cashedOutDate:   new Date().toISOString().slice(0, 10),
+    const outRef  = doc(collection(db, 'users', userId, 'transactions'));
+    const gainRef = gain > 0 ? doc(collection(db, 'users', userId, 'transactions')) : null;
+    batch.set(outRef, {
+      ...(w.fx || {}), loggedAt: Date.now(),
+      type: 'assetout', category: 'Investment withdrawal',
+      description: close ? `Cashed out ${asset.name}` : `Withdrawal from ${asset.name}`,
+      amount: gain > 0 ? round(w.received - gain * ratio) : w.received,
+      assetAmount: w.value, assetCost: cost, ...(units ? { assetUnits: units } : {}),
+      ...(close ? { assetBefore: { currentValue: value, costBasis: asset.costBasis || 0, units: held } } : {}),
+      ...(gainRef ? { pairId: gainRef.id } : {}),
+      date: w.date, accountId: w.accountId, assetId: asset.id,
     });
-
-    const txRef = doc(collection(db, 'users', userId, 'transactions'));
-    batch.set(txRef, {
-      loggedAt: Date.now(),
-      ...txMeta,
-      description: `Cash out: ${asset.name}`,
-      amount:      receivedAmount,
-      type:        'income',
-      category:    'Interest',
-      date:        new Date().toISOString().slice(0, 10),
-      accountId:   toAccountId,
-      assetId:     id,
-    });
-
-    batch.update(doc(db, 'users', userId, 'accounts', toAccountId), {
-      balance: increment(receivedAmount),
-    });
-
+    if (gainRef) {
+      batch.set(gainRef, {
+        ...(w.fx || {}), loggedAt: Date.now() + 1,
+        type: 'income', category: 'Investment Gain', description: `Gain on ${asset.name}`,
+        amount: round(gain * ratio), date: w.date, accountId: w.accountId, assetId: asset.id, assetGain: gain, pairId: outRef.id,
+      });
+    }
+    batch.update(doc(db, 'users', userId, 'accounts', w.accountId), { balance: increment(w.received) });
+    batch.update(doc(db, 'users', userId, 'assets', asset.id), close
+      ? { currentValue: 0, costBasis: 0, units: 0, status: 'cashed_out', cashedOutDate: w.date }
+      : { currentValue: increment(-w.value), costBasis: increment(-cost), ...unitsBy(-units) });
     await whenSaved(batch.commit());
-  }, [userId, assets]);
+  }, [userId]);
 
   // ── Money lent to others ────────────────────────────────────────────────
 
@@ -669,7 +699,7 @@ export function useFinanceData(userId) {
 
     // Remove links (and their converted amounts) that the edit dropped
     const writeUpdates = { ...updates };
-    ['debtId', 'assetId', 'debtAmount', 'assetAmount', 'projectId'].forEach(k => {
+    ['debtId', 'assetId', 'debtAmount', 'assetAmount', 'assetUnits', 'projectId'].forEach(k => {
       if (original[k] !== undefined && updates[k] === undefined) writeUpdates[k] = deleteField();
     });
     batch.update(doc(db, 'users', userId, 'transactions', original.id), writeUpdates);
@@ -706,12 +736,14 @@ export function useFinanceData(userId) {
       // Asset adjustment (savings linked to asset, amounts in the asset's currency)
       const oldAsset = assetAmt(original);
       const newAsset = updates.assetAmount ?? newAmt;
+      const oldUnits = unitsOf(original);
+      const newUnits = unitsOf(updates);
       if (original.assetId && original.assetId !== updates.assetId)
-        batch.update(doc(db, 'users', userId, 'assets', original.assetId), { currentValue: increment(-oldAsset), costBasis: increment(-oldAsset) });
+        batch.update(doc(db, 'users', userId, 'assets', original.assetId), { currentValue: increment(-oldAsset), costBasis: increment(-oldAsset), ...unitsBy(-oldUnits) });
       if (updates.assetId && updates.assetId !== original.assetId)
-        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset), costBasis: increment(newAsset) });
-      else if (updates.assetId && updates.assetId === original.assetId && newAsset !== oldAsset)
-        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset - oldAsset), costBasis: increment(newAsset - oldAsset) });
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset), costBasis: increment(newAsset), ...unitsBy(newUnits) });
+      else if (updates.assetId && updates.assetId === original.assetId && (newAsset !== oldAsset || newUnits !== oldUnits))
+        batch.update(doc(db, 'users', userId, 'assets', updates.assetId), { currentValue: increment(newAsset - oldAsset), costBasis: increment(newAsset - oldAsset), ...unitsBy(newUnits - oldUnits) });
     }
 
     await whenSaved(batch.commit());
@@ -724,7 +756,7 @@ export function useFinanceData(userId) {
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
-    addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    addAsset, updateAsset, updateAssetValue, withdrawFromAsset, deleteAsset,
     addProject, updateProject, deleteProject,
     lends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,

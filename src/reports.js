@@ -83,7 +83,7 @@ function summarise(txs) {
   const expenses = txs.filter(t => t.type === 'expense');
   const savings  = txs.filter(t => t.type === 'savings');
   return {
-    count: txs.length, income, expenses, savings,
+    count: txs.length, income, expenses, savings, withdrawals: txs.filter(t => t.type === 'assetout'),
     incomeTotal: total(income), spending: total(expenses), saved: total(savings),
     debtRepaid: total(expenses.filter(t => t.debtId)),
   };
@@ -175,7 +175,7 @@ function threeMonthAverages(transactions, start) {
   return Object.fromEntries(rollUp(past).map(c => [c.name, c.value / 3]));
 }
 
-function savingsFor(period, end, today, cur, assets) {
+function savingsFor(period, end, today, cur, assets, transactions) {
   const held = assets.filter(a => a.status === 'active' && !a.heldForOthers).map(a => {
     const rate = a.currentValue > 0 ? (a.baseValue || 0) / a.currentValue : 0;
     const cost = (a.costBasis || 0) * rate;
@@ -187,7 +187,12 @@ function savingsFor(period, end, today, cur, assets) {
     held,
     value: held.reduce((s, a) => s + a.value, 0),
     cost:  held.reduce((s, a) => s + a.cost, 0),
-    cashedOut: assets.filter(a => a.cashedOutDate >= period.start && a.cashedOutDate <= end),
+    // Cash-outs from before withdrawals existed; newer ones are covered by their withdrawals
+    cashedOut: assets.filter(a => a.cashedOutDate >= period.start && a.cashedOutDate <= end
+      && !transactions.some(t => t.type === 'assetout' && t.assetId === a.id)),
+    withdrawn: total(cur.withdrawals) + total(cur.income.filter(t => t.assetGain)),
+    gains:     total(cur.income.filter(t => t.assetGain)),
+    closed:    cur.withdrawals.filter(t => t.assetBefore).map(t => t.description.replace(/^Cashed out /, '')),
     maturing: assets.filter(a => a.status === 'active' && /^\d{4}-\d{2}-\d{2}$/.test(a.maturityDate || '')
       && a.maturityDate >= today && a.maturityDate <= soon),
   };
@@ -257,7 +262,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
 
   const position = netPosition({ accounts, assets, lends, debts });
   const history  = historyFor(period, end, snapshots, baseCurrency);
-  const savings  = savingsFor(period, end, today, cur, assets);
+  const savings  = savingsFor(period, end, today, cur, assets, transactions);
 
   // ── Commentary ─────────────────────────────────────────────────────────
   const soFar = partial ? ' so far' : '';
@@ -285,7 +290,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
       comments.income.push(`All of it came from ${top.name}, so this period relied on a single source.`);
     }
     const biggest = [...cur.income].sort((a, b) => b.baseAmount - a.baseAmount)[0];
-    const cashOuts = total(cur.income.filter(t => t.assetId));
+    const cashOuts = total(cur.income.filter(t => t.assetId && !t.assetGain));
     if (cashOuts > 0) comments.income.push(`This includes ${fmt(cashOuts)} from cashing out investments, much of which is your own money coming back rather than new income.`);
     if (cur.income.length > 1) comments.income.push(`The largest payment was ${quoted(biggest)} at ${fmt(biggest.baseAmount)} on ${fmtDay(biggest.date)}.`);
   } else if (cur.count > 0) {
@@ -390,6 +395,9 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
       if (best.gain > 0) comments.savings.push(`${best.name} has gained the most, at ${fmt(best.gain)}.`);
     }
   }
+  if (savings.withdrawn > 0) {
+    comments.savings.push(`You withdrew ${fmt(savings.withdrawn)} from investments${savings.gains > 0 ? `, including ${fmt(savings.gains)} of gain counted as income` : ''}.${savings.closed.length ? ` ${listOf(savings.closed)} ${savings.closed.length === 1 ? 'was' : 'were'} closed.` : ''}`);
+  }
   savings.cashedOut.forEach(a => {
     const gain = (a.cashedOutAmount || 0) - (a.costBasis || 0);
     comments.savings.push(`You cashed out ${a.name} on ${fmtDay(a.cashedOutDate)} for ${fmtCur(a.cashedOutAmount || 0, a.currency)}, ${fmtCur(Math.abs(gain), a.currency)} ${gain >= 0 ? 'more' : 'less'} than you put in.`);
@@ -448,7 +456,7 @@ export function buildReport({ period, transactions, budgets, accounts, debts, as
   debt.cleared.forEach(d => highlights.push(`${d.name} was paid off`));
   if (largest[0] && cur.expenses.length > 1) highlights.push(`Largest expense: ${quoted(largest[0])}, ${fmt(largest[0].baseAmount)}`);
   if (debt.borrowed.length) highlights.push(`New borrowing of ${fmt(newBorrowing)}`);
-  savings.cashedOut.forEach(a => highlights.push(`${a.name} was cashed out`));
+  [...savings.cashedOut.map(a => a.name), ...savings.closed].forEach(name => highlights.push(`${name} was cashed out`));
   if (over.length) highlights.push(`Biggest budget overrun: ${over[0].category}, ${fmt(over[0].actual - over[0].budget)}`);
 
   // ── Next steps ─────────────────────────────────────────────────────────

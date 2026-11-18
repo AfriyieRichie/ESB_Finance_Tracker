@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, RefreshCw, ArrowLeftRight, ChevronRight } from 'lucide-react';
-import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS } from '../hooks/useFinanceData';
+import { ACCOUNT_TYPES, ASSET_TYPES, POPULAR_ACCOUNTS, assetUsesUnits } from '../hooks/useFinanceData';
 import { ACCOUNT_TYPE_ICONS, ASSET_TYPE_ICONS } from './CategoryIcon';
 import { usePreferences, symbolFor } from '../contexts/PreferencesContext';
 import CurrencySelect, { BaseApprox } from './CurrencySelect';
@@ -13,6 +13,50 @@ import { lendOutstanding, isLendOverdue } from '../lends';
 import { useConfirm } from './Confirm';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+const fmtUnits = (n) => Number(n || 0).toLocaleString('en-GB', { maximumFractionDigits: 6 });
+const fmtShortDate = (d) => new Date(`${d}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+// An investment's purchases and withdrawals, oldest first (amounts in the investment's currency).
+// Anything held that no transaction explains (e.g. added without a funding account) shows as a
+// starting position.
+function assetHistory(asset, transactions) {
+  const rows = transactions
+    .filter(t => t.assetId === asset.id && (t.type === 'savings' || t.type === 'assetout'))
+    .sort(oldestFirst)
+    .map(t => (t.type === 'savings'
+      ? { id: t.id, date: t.date, action: 'Bought', units: Number(t.assetUnits) || 0, amount: t.assetAmount ?? t.amount, cost: t.assetAmount ?? t.amount }
+      : { id: t.id, date: t.date, action: t.assetBefore ? 'Cashed out' : 'Withdrew', units: -(Number(t.assetUnits) || 0),
+          amount: t.assetAmount || 0, cost: -(t.assetCost || 0), gain: (t.assetAmount || 0) - (t.assetCost || 0) }));
+  if (asset.status === 'active') {
+    const cost  = (asset.costBasis || 0) - rows.reduce((s, r) => s + r.cost, 0);
+    const units = (Number(asset.units) || 0) - rows.reduce((s, r) => s + r.units, 0);
+    if (cost > 0.005 || units > 0.000001) rows.unshift({ id: 'start', date: null, action: 'Starting position', units: Math.max(units, 0), amount: Math.max(cost, 0) });
+  }
+  return rows;
+}
+
+function AssetHistoryTable({ asset, rows }) {
+  const { fmtCur } = usePreferences();
+  const fmt = (v) => fmtCur(v, asset.currency);
+  const shares = (n) => `${fmtUnits(Math.abs(n))} ${Math.abs(n) === 1 ? 'share' : 'shares'}`;
+  return (
+    <ul className="asset-history">
+      {rows.map(r => (
+        <li key={r.id}>
+          <div className="ah-main">
+            <span>{r.action}{r.units ? ` ${shares(r.units)}` : ''}</span>
+            <strong>{fmt(r.amount)}</strong>
+          </div>
+          <div className="ah-sub">
+            <span>{r.date ? fmtShortDate(r.date) : 'Before tracking began'}{r.units ? ` · ${fmt(r.amount / Math.abs(r.units))} per share` : ''}</span>
+            {r.gain ? <span className={r.gain > 0 ? 'hist-gain' : 'hist-loss'}>{r.gain > 0 ? '+' : '−'}{fmt(Math.abs(r.gain))} {r.gain > 0 ? 'gain' : 'loss'}</span> : null}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const getAccountTypeMeta = (typeId) => ACCOUNT_TYPES.find(t => t.id === typeId) || ACCOUNT_TYPES[3];
 // assetTypes = built-in + custom investment types from preferences
@@ -355,6 +399,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
   const [costBasis,  setCostBasis]  = useState(existing?.costBasis    || '');
   const [currValue,  setCurrValue]  = useState(existing?.currentValue || '');
   const [maturity,   setMaturity]   = useState(existing?.maturityDate || '');
+  const [units,      setUnits]      = useState(existing?.units || '');
   const [sourceAcct, setSourceAcct] = useState('');
   const [busy,       setBusy]       = useState(false);
 
@@ -376,6 +421,7 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
         costBasis:    parseFloat(costBasis),
         currentValue: parseFloat(currValue) || parseFloat(costBasis),
         maturityDate: maturity || null,
+        ...(assetUsesUnits(assetType) && parseFloat(units) > 0 ? { units: parseFloat(units) } : {}),
       },
       sourceAcct || null,
       source ? Math.round(sourceCost * 100) / 100 : undefined,
@@ -420,6 +466,15 @@ function AssetModal({ existing, accounts, onSave, onClose }) {
                 value={currValue} onChange={e => setCurrValue(e.target.value)} />
             </div>
           </div>
+          {assetUsesUnits(assetType) && (
+            <div className="form-group">
+              <label>Number of shares / units (optional)</label>
+              <input type="number" min="0" step="any" placeholder="e.g. 25" value={units} onChange={e => setUnits(e.target.value)} />
+              {parseFloat(units) > 0 && parseFloat(costBasis) > 0 && (
+                <p className="fx-hint">{fmtCur(parseFloat(costBasis) / parseFloat(units), currency)} per share</p>
+              )}
+            </div>
+          )}
           <div className="form-group">
             <label>Maturity / End Date (optional)</label>
             <input type="date" value={maturity} onChange={e => setMaturity(e.target.value)} />
@@ -470,6 +525,7 @@ function UpdateValueModal({ asset, onSave, onClose }) {
   };
 
   const gain = parseFloat(value) - asset.costBasis;
+  const units = Number(asset.units) || 0;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -487,6 +543,13 @@ function UpdateValueModal({ asset, onSave, onClose }) {
             <input type="number" min="0" step="0.01" value={value}
               onChange={e => setValue(e.target.value)} autoFocus required />
           </div>
+          {units > 0 && (
+            <div className="form-group">
+              <label>Or price per share ({symbolFor(asset.currency)}) × {fmtUnits(units)} shares</label>
+              <input type="number" min="0" step="any" placeholder="Price today"
+                onChange={e => { const p = parseFloat(e.target.value); if (p >= 0) setValue(String(Math.round(p * units * 100) / 100)); }} />
+            </div>
+          )}
           {value !== '' && (
             <p style={{ fontSize: 13, color: gain >= 0 ? 'var(--success)' : 'var(--danger)' }}>
               {gain >= 0 ? '▲' : '▼'} {fmt(Math.abs(gain))} ({asset.costBasis > 0 ? ((gain / asset.costBasis) * 100).toFixed(1) : 0}%)
@@ -502,26 +565,54 @@ function UpdateValueModal({ asset, onSave, onClose }) {
   );
 }
 
-// ─── Cash Out Modal ────────────────────────────────────────────────────────
+// ─── Withdraw Modal ────────────────────────────────────────────────────────
 
-function CashOutModal({ asset, accounts, onCashOut, onClose }) {
+function WithdrawModal({ asset, accounts, onWithdraw, onClose }) {
   const { fmtCur, convert, txFxMeta } = usePreferences();
-  // Suggested payout in the receiving account's currency
-  const suggest = (acctId) => {
-    const acct = accounts.find(a => a.id === acctId);
-    const v    = acct ? convert(asset.currentValue || 0, asset.currency, acct.currency) : asset.currentValue;
-    return v === null || v === undefined ? '' : String(Math.round(v * 100) / 100);
-  };
+  const fmt   = (v) => fmtCur(v, asset.currency);
+  const held  = Number(asset.units) || 0;
+  const value = Number(asset.currentValue) || 0;
+  const [close,    setClose]    = useState(false);
+  const [units,    setUnits]    = useState('');
+  const [amount,   setAmount]   = useState('');
   const [toAcct,   setToAcct]   = useState(accounts[0]?.id || '');
-  const [amount,   setAmount]   = useState(() => suggest(accounts[0]?.id));
+  const [received, setReceived] = useState('');
+  const [date,     setDate]     = useState(new Date().toISOString().slice(0, 10));
   const [busy,     setBusy]     = useState(false);
-  const target = accounts.find(a => a.id === toAcct);
+
+  const target   = accounts.find(a => a.id === toAcct);
+  const crossCur = target && target.currency !== asset.currency;
+  const u     = close ? held : (parseFloat(units) || 0);
+  const amt   = parseFloat(amount) || 0;
+  const share = close ? 1 : held > 0 && u > 0 ? u / held : value > 0 ? amt / value : 0;
+  const cost  = (asset.costBasis || 0) * Math.min(share, 1);
+  const gain  = amt - cost;
+  const tooMuch = !close && (amt > value + 0.005 || (held > 0 && u > held + 0.000001));
+  const suggestReceived = (v, acctId = toAcct) => {
+    const acct = accounts.find(a => a.id === acctId);
+    if (!acct || !(v > 0)) return '';
+    const c = acct.currency === asset.currency ? v : convert(v, asset.currency, acct.currency);
+    return c === null ? '' : String(Math.round(c * 100) / 100);
+  };
+  const setAmountAndReceived = (v) => { setAmount(v); setReceived(suggestReceived(parseFloat(v))); };
+
+  const toggleClose = (on) => {
+    setClose(on);
+    if (on) { setUnits(''); setAmountAndReceived(String(value)); }
+  };
+  const changeUnits = (v) => {
+    setUnits(v);
+    const n = parseFloat(v);
+    if (held > 0 && n > 0) setAmountAndReceived(String(Math.round((value * n / held) * 100) / 100));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!toAcct || !amount) return;
+    if (!(amt > 0) || !toAcct || tooMuch) return;
+    const got = crossCur ? parseFloat(received) : amt;
+    if (!(got > 0)) return;
     setBusy(true);
-    await onCashOut(asset.id, parseFloat(amount), toAcct, txFxMeta(target?.currency));
+    await onWithdraw(asset, { value: amt, units: u, close, accountId: toAcct, received: got, date, fx: txFxMeta(target.currency) });
     onClose();
   };
 
@@ -529,31 +620,59 @@ function CashOutModal({ asset, accounts, onCashOut, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Cash Out — {asset.name}</h3>
+          <h3>Withdraw from {asset.name}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} className="modal-form">
-          <p style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
-            This will close the asset and credit the received amount to your chosen account.
-            Current value: <strong>{fmtCur(asset.currentValue, asset.currency)}</strong>.
+          <p className="fx-hint">
+            Worth {fmt(value)} now{held > 0 ? ` (${fmtUnits(held)} shares)` : ''}, with {fmt(asset.costBasis || 0)} of your own money in it.
           </p>
+          <label className="held-check">
+            <input type="checkbox" checked={close} onChange={e => toggleClose(e.target.checked)} />
+            Withdraw everything and close this investment
+          </label>
+          {held > 0 && !close && (
+            <div className="form-group">
+              <label>Shares sold (optional)</label>
+              <input type="number" min="0" step="any" max={held} placeholder={`Up to ${fmtUnits(held)}`} value={units} onChange={e => changeUnits(e.target.value)} />
+            </div>
+          )}
           <div className="form-group">
-            <label>Credit to Account</label>
-            <select value={toAcct} onChange={e => { setToAcct(e.target.value); setAmount(suggest(e.target.value)); }} required>
+            <label>{close ? 'Total value withdrawn' : 'Value withdrawn'} ({symbolFor(asset.currency)})</label>
+            <input type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmountAndReceived(e.target.value)} autoFocus={!held} required />
+          </div>
+          {tooMuch && (
+            <p className="fx-hint" style={{ color: 'var(--danger)' }}>
+              That's more than this investment holds. Update its value first, or tick "Withdraw everything" if you're closing it.
+            </p>
+          )}
+          <div className="form-group">
+            <label>Paid into account</label>
+            <select value={toAcct} onChange={e => { setToAcct(e.target.value); setReceived(suggestReceived(amt, e.target.value)); }} required>
               <option value="">— Select account —</option>
-              {accounts.map(a => (
-                <option key={a.id} value={a.id}>{a.name} ({fmtCur(a.balance, a.currency)})</option>
-              ))}
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}
             </select>
           </div>
+          {crossCur && (
+            <div className="form-group">
+              <label>Amount that arrived in {target.name} ({symbolFor(target.currency)})</label>
+              <input type="number" min="0.01" step="0.01" value={received} onChange={e => setReceived(e.target.value)} required />
+            </div>
+          )}
           <div className="form-group">
-            <label>Amount Received ({symbolFor(target?.currency || asset.currency)})</label>
-            <input type="number" min="0" step="0.01" value={amount}
-              onChange={e => setAmount(e.target.value)} autoFocus required />
+            <label>Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
           </div>
+          {amt > 0 && !tooMuch && (
+            <p className="fx-hint">
+              {fmt(Math.min(cost, amt))} of this is your own money coming back
+              {gain > 0.005 ? <>, and <b>{fmt(gain)}</b> is gain, recorded as income.</> : gain < -0.005 ? <>. It's <b>{fmt(-gain)}</b> less than you put in.</> : '.'}
+              {!close && share < 0.9999 && <> {fmt(value - amt)}{held > 0 ? ` (${fmtUnits(held - u)} shares)` : ''} stays invested.</>}
+            </p>
+          )}
           <div className="form-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={busy}>Confirm Cash Out</button>
+            <button type="submit" className="btn-primary" disabled={busy || tooMuch}>{close ? 'Close investment' : 'Withdraw'}</button>
           </div>
         </form>
       </div>
@@ -585,7 +704,7 @@ function AccountActivityModal({ account, accounts, transactions, onClose }) {
           detail: incoming ? `Transfer from ${acctName(t.fromAccountId)}` : `Transfer to ${acctName(t.toAccountId)}`,
         };
       }
-      return { ...t, signed: ['income', 'loan', 'lendrepay'].includes(t.type) ? t.amount : -t.amount, detail: t.category };
+      return { ...t, signed: ['income', 'loan', 'lendrepay', 'assetout'].includes(t.type) ? t.amount : -t.amount, detail: t.category };
     })
     .sort(sort === 'newest' ? newestFirst : oldestFirst);
 
@@ -783,13 +902,18 @@ function DebtCard({ debt, onEdit, onDelete, onSettle }) {
 
 // ─── Asset Card ────────────────────────────────────────────────────────────
 
-function AssetCard({ asset, onUpdateValue, onCashOut, onDelete, onToggleHeld }) {
+function AssetCard({ asset, transactions, onUpdateValue, onWithdraw, onDelete, onToggleHeld }) {
   const { fmtCur, assetTypes } = usePreferences();
+  const [showHistory, setShowHistory] = useState(false);
   const fmt = (v) => fmtCur(v, asset.currency);
   const Icon = ASSET_TYPE_ICONS[asset.assetType] || ASSET_TYPE_ICONS.other;
   const meta = getAssetTypeMeta(assetTypes, asset.assetType);
   const gain = asset.currentValue - asset.costBasis;
   const gainPct = asset.costBasis > 0 ? ((gain / asset.costBasis) * 100).toFixed(1) : 0;
+  const units = Number(asset.units) || 0;
+  const history = assetHistory(asset, transactions);
+  const withdrawn = history.filter(r => r.gain !== undefined);
+  const realised  = withdrawn.reduce((s, r) => s + r.gain, 0);
 
   return (
     <div className="asset-card">
@@ -813,6 +937,12 @@ function AssetCard({ asset, onUpdateValue, onCashOut, onDelete, onToggleHeld }) 
       </label>
 
       <div className="asset-values">
+        {units > 0 && (
+          <div className="asset-val-row">
+            <span className="asset-val-label">Shares</span>
+            <span className="asset-val">{fmtUnits(units)} · avg {fmt(asset.costBasis / units)}</span>
+          </div>
+        )}
         <div className="asset-val-row">
           <span className="asset-val-label">Invested</span>
           <span className="asset-val">{fmt(asset.costBasis)}</span>
@@ -821,6 +951,7 @@ function AssetCard({ asset, onUpdateValue, onCashOut, onDelete, onToggleHeld }) 
           <span className="asset-val-label">Current Value</span>
           <span className="asset-val" style={{ color: 'var(--text-1)', fontWeight: 700, textAlign: 'right' }}>
             {fmt(asset.currentValue)}
+            {units > 0 && <span className="fx-approx">{fmt(asset.currentValue / units)} per share</span>}
             <BaseApprox amount={asset.currentValue} currency={asset.currency} />
           </span>
         </div>
@@ -830,16 +961,72 @@ function AssetCard({ asset, onUpdateValue, onCashOut, onDelete, onToggleHeld }) 
             {gain >= 0 ? '+' : ''}{fmt(gain)} ({gainPct}%)
           </span>
         </div>
+        {withdrawn.length > 0 && (
+          <div className="asset-val-row">
+            <span className="asset-val-label">Withdrawn so far</span>
+            <span className="asset-val">
+              {fmt(withdrawn.reduce((s, r) => s + r.amount, 0))}
+              {Math.abs(realised) > 0.005 && <span className="fx-approx">{realised > 0 ? `incl. ${fmt(realised)} gain` : `${fmt(-realised)} below cost`}</span>}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="asset-card-actions">
         <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={() => onUpdateValue(asset)}>
           Update Value
         </button>
-        <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px', color: 'var(--success)' }} onClick={() => onCashOut(asset)}>
-          Cash Out
+        <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px', color: 'var(--success)' }} onClick={() => onWithdraw(asset)}>
+          Withdraw
         </button>
+        {history.length > 0 && (
+          <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} aria-expanded={showHistory} onClick={() => setShowHistory(v => !v)}>
+            {showHistory ? 'Hide history' : 'History'}
+          </button>
+        )}
       </div>
+      {showHistory && <AssetHistoryTable asset={asset} rows={history} />}
+    </div>
+  );
+}
+
+// A fully withdrawn investment, kept in the Closed list with what went in and what came out.
+// Older cash-outs (before withdrawals existed) only have their recorded payout.
+function ClosedAssetCard({ asset, transactions, onDelete }) {
+  const { fmtCur, assetTypes } = usePreferences();
+  const [showHistory, setShowHistory] = useState(false);
+  const fmt  = (v) => fmtCur(v, asset.currency);
+  const meta = getAssetTypeMeta(assetTypes, asset.assetType);
+  const history = assetHistory(asset, transactions);
+  const outs = history.filter(r => r.gain !== undefined);
+  const putIn = outs.length ? outs.reduce((s, r) => s - r.cost, 0) : asset.costBasis || 0;
+  const tookOut = outs.length ? outs.reduce((s, r) => s + r.amount, 0) : asset.cashedOutAmount;
+  const result = tookOut != null ? tookOut - putIn : null;
+  return (
+    <div className="asset-card paid-debt">
+      <div className="asset-card-header">
+        <div>
+          <p className="acct-name">✓ {asset.name}</p>
+          <p className="acct-type">{meta.label}{asset.cashedOutDate ? ` · Closed ${fmtShortDate(asset.cashedOutDate)}` : ''}</p>
+        </div>
+        <button className="icon-btn delete-btn" onClick={() => onDelete(asset.id)} title="Delete from history"><Trash2 size={13} strokeWidth={1.6} /></button>
+      </div>
+      <div className="bg-figures">
+        <div><span className="bs-label">Put in</span><span className="bg-val">{fmt(putIn)}</span></div>
+        <div><span className="bs-label">Took out</span><span className="bg-val">{tookOut != null ? fmt(tookOut) : '—'}</span></div>
+        <div>
+          <span className="bs-label">Gain / loss</span>
+          <span className={`bg-val ${result >= 0 ? 'good' : 'bad'}`}>{result != null ? `${result >= 0 ? '+' : '−'}${fmt(Math.abs(result))}` : '—'}</span>
+        </div>
+      </div>
+      {history.length > 0 && (
+        <div className="asset-card-actions">
+          <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} aria-expanded={showHistory} onClick={() => setShowHistory(v => !v)}>
+            {showHistory ? 'Hide history' : 'History'}
+          </button>
+        </div>
+      )}
+      {showHistory && <AssetHistoryTable asset={asset} rows={history} />}
     </div>
   );
 }
@@ -1010,7 +1197,7 @@ function GroupTile({ id, title, count, noun, countLabel, open, onToggle, onAdd, 
 
 // ─── Main Accounts Page ────────────────────────────────────────────────────
 
-export default function Accounts({ accounts, debts, assets, transactions = [], lends = [], addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend, projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset, addTransfer }) {
+export default function Accounts({ accounts, debts, assets, transactions = [], lends = [], addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend, projects = [], addProject, updateProject, deleteProject, recordLoanReceipt, missingRates = [], addAccount, updateAccount, deleteAccount, addDebt, updateDebt, deleteDebt, addAsset, updateAsset, updateAssetValue, withdrawFromAsset, deleteAsset, addTransfer }) {
   const { fmt, fmtCur, baseCurrency, toBase } = usePreferences();
   const [modal, setModal] = useState(null); // { type, data? }
   const close = () => setModal(null);
@@ -1041,6 +1228,9 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
 
   // ── Totals per group, in the base currency ────────────────────────────
   const activeAssets = assets.filter(a => a.status === 'active');
+  const closedAssets = assets.filter(a => a.status !== 'active')
+    .sort((a, b) => (b.cashedOutDate || '').localeCompare(a.cashedOutDate || ''));
+  const [showClosedAssets, setShowClosedAssets] = useState(false);
   const openDebts    = debts.filter(d => !isPaidOff(d));
   const paidDebts    = debts.filter(isPaidOff)
     .sort((a, b) => (b.paidOffDate || '').localeCompare(a.paidOffDate || ''));
@@ -1245,20 +1435,35 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
         {openGroup === 'assets' && (
           <div className="group-panel">
             {activeAssets.length === 0 ? (
-              <p className="accounts-empty">No assets tracked yet. Add a treasury bill, property, or any investment.</p>
+              <p className="accounts-empty">{closedAssets.length ? 'No open investments.' : 'No assets tracked yet. Add a treasury bill, property, or any investment.'}</p>
             ) : (
               <div className="asset-grid">
                 {activeAssets.map(a => (
                   <AssetCard
                     key={a.id}
                     asset={a}
+                    transactions={transactions}
                     onUpdateValue={asset => setModal({ type: 'updateValue', data: asset })}
-                    onCashOut={asset => setModal({ type: 'cashOut', data: asset })}
+                    onWithdraw={asset => setModal({ type: 'withdraw', data: asset })}
                     onDelete={confirmDeleteAsset}
                     onToggleHeld={(asset, v) => updateAsset(asset.id, { heldForOthers: v })}
                   />
                 ))}
               </div>
+            )}
+            {closedAssets.length > 0 && (
+              <>
+                <button type="button" className={`history-toggle ${showClosedAssets ? 'open' : ''}`}
+                  aria-expanded={showClosedAssets} onClick={() => setShowClosedAssets(v => !v)}>
+                  <span>Closed ({closedAssets.length})</span>
+                  <ChevronRight size={15} strokeWidth={1.8} className="bg-chevron" />
+                </button>
+                {showClosedAssets && (
+                  <div className="asset-grid">
+                    {closedAssets.map(a => <ClosedAssetCard key={a.id} asset={a} transactions={transactions} onDelete={confirmDeleteAsset} />)}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1417,8 +1622,8 @@ export default function Accounts({ accounts, debts, assets, transactions = [], l
       {modal?.type === 'updateValue' && (
         <UpdateValueModal asset={modal.data} onSave={updateAssetValue} onClose={close} />
       )}
-      {modal?.type === 'cashOut' && (
-        <CashOutModal asset={modal.data} accounts={accounts} onCashOut={cashOutAsset} onClose={close} />
+      {modal?.type === 'withdraw' && (
+        <WithdrawModal asset={assets.find(a => a.id === modal.data.id) || modal.data} accounts={accounts} onWithdraw={withdrawFromAsset} onClose={close} />
       )}
       {confirmDialog}
     </div>

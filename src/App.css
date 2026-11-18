@@ -2713,3 +2713,14 @@ select optgroup {
 .budget-copy-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .budget-copy-note { font-size: 13px; color: var(--text-2); margin: -12px 0 16px; }
 .budget-copy-note .auth-switch-link { font-size: 13px; }
+
+/* ─── Investment history (purchases and withdrawals) ── */
+.asset-history { list-style: none; display: flex; flex-direction: column; margin-top: 12px; border-top: 1px solid var(--border); }
+.asset-history li { padding: 9px 0; border-bottom: 1px solid var(--border); }
+.asset-history li:last-child { border-bottom: none; }
+.ah-main, .ah-sub { display: flex; justify-content: space-between; gap: 10px; }
+.ah-main { font-size: 13px; color: var(--text-1); }
+.ah-main strong { font-weight: 600; white-space: nowrap; }
+.ah-sub { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
+.hist-gain { color: var(--success); white-space: nowrap; }
+.hist-loss { color: var(--danger); white-space: nowrap; }

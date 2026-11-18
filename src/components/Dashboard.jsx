@@ -398,7 +398,7 @@ export default function Dashboard({ transactions, allTransactions, budgets, acco
                   </span>
                 </div>
                 <span className={`recent-amount ${t.type}`}>
-                  {['income', 'loan', 'lendrepay'].includes(t.type) ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmtCur(t.amount, t.currency)}
+                  {['income', 'loan', 'lendrepay', 'assetout'].includes(t.type) ? '+' : t.type === 'savings' ? '→ ' : '-'}{fmtCur(t.amount, t.currency)}
                 </span>
               </div>
             );

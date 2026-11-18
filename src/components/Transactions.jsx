@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight, Pencil, HandCoins, Send, Undo2 } from 'lucide-react';
+import { Search, Calendar, ChevronDown, ClipboardList, TrendingUp, TrendingDown, PiggyBank, ArrowLeftRight, Pencil, HandCoins, Send, Undo2, ArrowDownToLine } from 'lucide-react';
 
-const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight, loan: HandCoins, lend: Send, lendrepay: Undo2 };
-const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer', loan: 'Loan received', lend: 'Money lent', lendrepay: 'Repaid to me' };
+const TYPE_ICON  = { income: TrendingUp, expense: TrendingDown, savings: PiggyBank, transfer: ArrowLeftRight, loan: HandCoins, lend: Send, lendrepay: Undo2, assetout: ArrowDownToLine };
+const TYPE_LABEL = { income: 'Income', expense: 'Expense', savings: 'Savings', transfer: 'Transfer', loan: 'Loan received', lend: 'Money lent', lendrepay: 'Repaid to me', assetout: 'Investment withdrawal' };
 function TypeBadge({ type }) {
   const Icon = TYPE_ICON[type] || TrendingDown;
   return (
@@ -18,6 +18,7 @@ import CategoryIcon from './CategoryIcon';
 import CategorySelect from './CategorySelect';
 import { newestFirst } from '../txOrder';
 import { useConfirm } from './Confirm';
+import { assetUsesUnits } from '../hooks/useFinanceData';
 
 function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, projects = [], addTransfer, budgets, existing }) {
   const { fmtCur, convert, txFxMeta } = usePreferences();
@@ -43,6 +44,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
   const [accountId,   setAccountId]=useState(existing?.accountId || accounts[0]?.id || '');
   const [debtId,      setDebtId]  = useState(existing?.debtId || '');
   const [assetId,     setAssetId] = useState(existing?.assetId || '');
+  const [units,       setUnits]   = useState(existing?.assetUnits ?? '');
   const [projectId,   setProjectId] = useState(existing?.projectId || '');
   const [warning,     setWarning] = useState(null);
   const [miniFrom,    setMiniFrom]= useState('');
@@ -63,6 +65,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
     setWarning(null);
     setDebtId('');
     setAssetId('');
+    setUnits('');
   };
 
   const account  = accounts.find(a => a.id === accountId);
@@ -92,6 +95,7 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
     if (linkedAsset) {
       tx.assetId = assetId;
       if (assetAmount !== null) tx.assetAmount = assetAmount;
+      if (Number(units) > 0) tx.assetUnits = Number(units);
     }
     if (projectId) tx.projectId = projectId;
     return tx;
@@ -334,6 +338,15 @@ function TransactionModal({ onSave, onUpdate, onClose, accounts, debts, assets, 
                 )}
               </div>
             )}
+            {linkedAsset && (linkedAsset.units > 0 || assetUsesUnits(linkedAsset.assetType)) && (
+              <div className="form-group">
+                <label>Shares / units bought (optional)</label>
+                <input type="number" min="0" step="any" placeholder="e.g. 10" value={units} onChange={e => setUnits(e.target.value)} />
+                {Number(units) > 0 && amount && (
+                  <p className="fx-hint">{fmtCur((assetAmount ?? Number(amount)) / Number(units), linkedAsset.currency)} per share</p>
+                )}
+              </div>
+            )}
 
             <div className="form-actions">
               <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
@@ -435,6 +448,7 @@ const TYPE_FILTER_OPTIONS = [
   { value: 'loan',     label: '⤓ Loan received' },
   { value: 'lend',     label: '↗ Money lent' },
   { value: 'lendrepay', label: '↙ Repaid to me' },
+  { value: 'assetout', label: '↙ Investment withdrawal' },
 ];
 
 export default function Transactions({ transactions, addTransaction, updateTransaction, deleteTransaction, accounts, debts, assets, projects = [], addTransfer, budgets }) {
@@ -482,7 +496,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
   const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.baseAmount, 0);
   const totalSavings  = filtered.filter(t => t.type === 'savings').reduce((s, t) => s + t.baseAmount, 0);
 
-  const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '', loan: '+', lend: '-', lendrepay: '+' };
+  const typeSignMap  = { income: '+', expense: '-', savings: '→ ', transfer: '', loan: '+', lend: '-', lendrepay: '+', assetout: '+' };
 
   const isFiltered = filterCategory !== 'All' || filterType !== 'All' || filterAccount !== 'All' || filterProject !== 'All' || search;
 
@@ -606,7 +620,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                         : <BaseApprox amount={t.amount} currency={t.currency} />}
                     </td>
                     <td className="tx-actions">
-                      {!isTransfer && !['loan', 'lend', 'lendrepay'].includes(t.type) && !t.lendId && (
+                      {!isTransfer && !['loan', 'lend', 'lendrepay', 'assetout'].includes(t.type) && !t.lendId && !t.assetGain && (
                         <button className="icon-btn edit-btn" onClick={() => setEditingTx(t)} title="Edit">
                           <Pencil size={13} strokeWidth={1.6} />
                         </button>
@@ -614,7 +628,7 @@ export default function Transactions({ transactions, addTransaction, updateTrans
                       <button className="icon-btn delete-btn" title="Delete" onClick={async () => {
                         if (await confirm({
                           title: 'Delete this transaction?',
-                          message: `"${t.description}" (${fmtCur(t.amount, t.currency)}, ${t.date}). Its effect on your balances will be reversed. You can restore it later from Settings → Data → Deleted transactions.`,
+                          message: `"${t.description}" (${fmtCur(t.amount, t.currency)}, ${t.date}). Its effect on your balances will be reversed.${t.pairId ? (t.type === 'assetout' ? ' Its gain entry is deleted with it.' : ' The withdrawal it belongs to is deleted with it.') : ''} You can restore it later from Settings → Data → Deleted transactions.`,
                         })) deleteTransaction(t.id);
                       }}>✕</button>
                     </td>

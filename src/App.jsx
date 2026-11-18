@@ -126,7 +126,7 @@ function AppContent() {
     upsertBudget, deleteBudget,
     addAccount, updateAccount, deleteAccount,
     addDebt, updateDebt, deleteDebt, recordLoanReceipt,
-    addAsset, updateAsset, updateAssetValue, cashOutAsset, deleteAsset,
+    addAsset, updateAsset, updateAssetValue, withdrawFromAsset, deleteAsset,
     projects, addProject, updateProject, deleteProject,
     lends: rawLends, addLend, lendMore, updateLend, recordLendRepayment, writeOffLend, deleteLend,
     listDeletedTransactions, restoreTransaction, forgetDeletedTransaction,
@@ -448,7 +448,7 @@ function AppContent() {
                 addAccount={addAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}
                 addDebt={addDebt} updateDebt={updateDebt} deleteDebt={deleteDebt} recordLoanReceipt={recordLoanReceipt}
                 addAsset={addAsset} updateAsset={updateAsset} updateAssetValue={updateAssetValue}
-                cashOutAsset={cashOutAsset} deleteAsset={deleteAsset} addTransfer={addTransfer}
+                withdrawFromAsset={withdrawFromAsset} deleteAsset={deleteAsset} addTransfer={addTransfer}
               />
             )}
             {activeTab === 'reports' && (
