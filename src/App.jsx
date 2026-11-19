@@ -312,23 +312,26 @@ function AppContent() {
     ? currentUser.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : currentUser.email[0].toUpperCase();
 
+  const navTabs = TABS.map(tab => (
+    <button key={tab.id}
+      className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
+      onClick={() => setActiveTab(tab.id)}>
+      <span className="tab-icon">{tab.icon}</span>
+      <span className="tab-label">{tab.label}</span>
+    </button>
+  ));
+
   return (
     <div className="app">
+      {/* Phones: the bottom tab bar lives outside the sticky header. A fixed bar nested inside a
+          sticky one drifts up the screen on iPhone while scrolling. */}
+      <nav className="header-nav mobile-only">{navTabs}</nav>
       <header className="app-header">
         <div className="header-brand">
           <BrandLogo className="brand-wordmark" />
         </div>
 
-        <nav className="header-nav">
-          {TABS.map(tab => (
-            <button key={tab.id}
-              className={`nav-tab ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}>
-              <span className="tab-icon">{tab.icon}</span>
-              <span className="tab-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
+        <nav className="header-nav desktop-only">{navTabs}</nav>
 
         <div className="header-user">
           <div className="user-avatar" title={currentUser.displayName || currentUser.email}
